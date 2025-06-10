@@ -30,10 +30,8 @@ from db import (
     get_day,
 )
 
-# Состояния для ConversationHandler
 ASK_NAME, ASK_START_TIME, ASK_END_TIME, ASK_REMINDERS = range(4)
 
-# Эмодзи
 DEVIL = "😈"
 CLOVER = "🍀"
 HEART_RED = "❤️"
@@ -194,10 +192,11 @@ async def add_pushups_generic(update, context, count):
     if not user_db:
         await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
         return
+
     user_name = user_db["username"] or user_db["name"] or "друг"
     cur = user_db["pushups_today"]
 
-    # Теперь разрешаем превысить 100, но только однократно
+    # Если уже >= 100 — больше не даём добавить ни одной попытки
     if cur >= 100:
         await update.message.reply_text(
             "Нельзя добавить больше 100 отжиманий за день!",
@@ -205,6 +204,7 @@ async def add_pushups_generic(update, context, count):
         )
         return
 
+    # Этот вызов должен позволять превысить 100 (например, было 79, добавил 44 — стало 123)
     ok = add_pushups(user.id, count)
     new_count = get_pushups_today(user.id)
 
@@ -298,4 +298,40 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         next_day(user.id)
         await update.message.reply_text(
-            f"Поздравляю, *{user_name}
+            f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard()
+        )
+    await status(update, context)
+
+def main():
+    application = Application.builder().token(TOKEN).build()
+
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_start_time)],
+            ASK_START_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_end_time)],
+            ASK_END_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_reminders)],
+            ASK_REMINDERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_reminders)],
+        },
+        fallbacks=[CommandHandler("start", start), CommandHandler("reset", reset)],
+    )
+
+    application.add_handler(conv_handler)
+    application.add_handler(CommandHandler("reset", reset))
+    application.add_handler(CommandHandler("status", status))
+    application.add_handler(CommandHandler("addday", addday))
+    application.add_handler(CommandHandler("add10", add10))
+    application.add_handler(CommandHandler("add15", add15))
+    application.add_handler(CommandHandler("add20", add20))
+    application.add_handler(CommandHandler("add25", add25))
+    application.add_handler(CommandHandler("add", add_custom))
+    # ВАЖНО: этот обработчик должен быть последним для TEXT
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
+
+    logger.info("Bot started!")
+    application.run_polling()
+
+if __name__ == "__main__":
+    main()
