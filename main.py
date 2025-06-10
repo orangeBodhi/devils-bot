@@ -262,7 +262,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bar_days = progress_bar(day, 90, 3)
     bar_pushups = progress_bar(pushups, 100, 5)
     msg = (
-        f"DAY: {emoji_number(day)}/90 {bar_days}\n"
+        f"DAY: {emoji_number(day)} {bar_days}\n"
         f"PROGRESS: {emoji_number(pushups)} {bar_pushups}\n"
         f"HEALTH: {hearts(fails)}\n"
     )
