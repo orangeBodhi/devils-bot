@@ -214,7 +214,7 @@ async def add_pushups_generic(update, context, count):
         reply_markup=get_main_keyboard()
     )
     await update.message.reply_text(
-        f"Текущий прогресс: {emoji_number(new_count)}/100",
+        f"Текущий прогресс: {emoji_number(new_count)}",
         reply_markup=get_main_keyboard()
     )
     if new_count >= 100 and cur < 100:
@@ -263,7 +263,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bar_pushups = progress_bar(pushups, 100, 5)
     msg = (
         f"DAY: {emoji_number(day)}/90 {bar_days}\n"
-        f"PROGRESS: {emoji_number(pushups)}/100 {bar_pushups}\n"
+        f"PROGRESS: {emoji_number(pushups)} {bar_pushups}\n"
         f"HEALTH: {hearts(fails)}\n"
     )
     await update.message.reply_text(msg, reply_markup=get_main_keyboard())
