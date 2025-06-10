@@ -364,21 +364,21 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     in_work_time = start_time <= now < end_time
 
     if in_work_time:
-        await update.message.reply_text(
-            f"{DEVIL} Приветствую в Devil's 100 challenge, *{user_name}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
-            reply_markup=get_main_keyboard(),
-            parse_mode="Markdown"
-        )
-    else:
-        await update.message.reply_text(
-            f"{DEVIL} Поздравляю с регистрацией в Devil's 100 challenge, *{user_name}*! Ожидай начала первого дня согласно настроек (в момент начала дня, который ты установил при регистрации, и стартует челлендж!) Увидимся! 👋",
-            reply_markup=get_main_keyboard(),
-            parse_mode="Markdown"
-        )
+    await update.message.reply_text(
+        f"{DEVIL} Приветствую в Devil's 100 challenge, *{user_name}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
+        reply_markup=get_main_keyboard(),
+        parse_mode="Markdown"
+    )
+    await status(update, context)  # Показываем статус только если челлендж стартовал!
+else:
+    await update.message.reply_text(
+        f"{DEVIL} Поздравляю с регистрацией в Devil's 100 challenge, *{user_name}*! Ожидай начала первого дня согласно настройкам (в момент начала дня, который ты установил при регистрации, и стартует челлендж!) Увидимся! 👋",
+        reply_markup=get_main_keyboard(),
+        parse_mode="Markdown"
+    )
 
-    start_reminders(context.application, user.id, update.effective_chat.id)
-    await status(update, context)
-    return ConversationHandler.END
+start_reminders(context.application, user.id, update.effective_chat.id)
+return ConversationHandler.END
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
