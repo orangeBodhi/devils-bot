@@ -39,7 +39,7 @@ def init_db():
 def add_user(user_id, username, start_time, end_time, reminders):
     with get_connection() as conn:
         c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO users (user_id, username, start_time, end_time, reminders, day) VALUES (?, ?, ?, ?, ?, 1)",
+        c.execute("INSERT OR REPLACE INTO users (user_id, username, start_time, end_time, reminders, day, pushups_today, fails) VALUES (?, ?, ?, ?, ?, 1, 0, 0)",
                   (user_id, username, start_time, end_time, reminders))
         conn.commit()
 
@@ -83,3 +83,23 @@ def next_day(user_id):
                   (user_id, user["day"], user["pushups_today"], datetime.utcnow().isoformat()))
         c.execute("UPDATE users SET day=day+1, pushups_today=0 WHERE user_id=?", (user_id,))
         conn.commit()
+
+def fail_day(user_id):
+    user = get_user(user_id)
+    if user:
+        fails = user["fails"] + 1
+        with get_connection() as conn:
+            c = conn.cursor()
+            c.execute("UPDATE users SET fails=?, pushups_today=0, day=day+1 WHERE user_id=?", (fails, user_id))
+            c.execute("INSERT INTO progress (user_id, day, pushups, date) VALUES (?, ?, ?, ?)",
+                      (user_id, user["day"], user["pushups_today"], datetime.utcnow().isoformat()))
+            conn.commit()
+        return fails
+
+def get_fails(user_id):
+    user = get_user(user_id)
+    return user["fails"] if user else 0
+
+def get_day(user_id):
+    user = get_user(user_id)
+    return user["day"] if user else 1
