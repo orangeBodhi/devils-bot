@@ -99,7 +99,7 @@ async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     await update.message.reply_text(
         "Сколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
     )
-    return ASK_REMINDERS  # Дальше пойдем в save_reminders
+    return ASK_REMINDERS
 
 async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
@@ -127,11 +127,9 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if get_user(user.id):
-        reset_user(user.id)
-        await update.message.reply_text("Все данные сброшены! Можешь пройти регистрацию заново через /start.")
-    else:
-        await update.message.reply_text("Ты ещё не зарегистрирован!")
+    # Всегда делаем сброс, даже если пользователь не найден
+    reset_user(user.id)
+    await update.message.reply_text("Все данные сброшены! Можешь пройти регистрацию заново через /start.")
 
 async def add_pushups_generic(update, context, count):
     user = update.effective_user
@@ -241,7 +239,7 @@ def main():
             ASK_END_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_reminders)],
             ASK_REMINDERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_reminders)],
         },
-        fallbacks=[CommandHandler("start", start)],
+        fallbacks=[CommandHandler("start", start), CommandHandler("reset", reset)],
     )
 
     application.add_handler(conv_handler)
