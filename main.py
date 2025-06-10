@@ -363,7 +363,7 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     end_time = datetime.strptime(context.user_data["end_time"], "%H:%M").time()
     in_work_time = start_time <= now < end_time
 
-    if in_work_time:
+if in_work_time:
     await update.message.reply_text(
         f"{DEVIL} Приветствую в Devil's 100 challenge, *{user_name}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
         reply_markup=get_main_keyboard(),
