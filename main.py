@@ -162,8 +162,8 @@ def is_within_today_working_period(start_time, end_time):
     start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
     end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
     return start_dt <= now < end_dt
-
-async def send_reminders_loop(application, user_id, chat_id):
+    
+    async def send_reminders_loop(application, user_id, chat_id):
     u = get_user(user_id)
     if not u:
         return
@@ -228,13 +228,29 @@ async def send_reminders_loop(application, user_id, chat_id):
         if u:
             user_name = u["username"] or u["name"] or "друг"
             if u["pushups_today"] >= 100:
+                day_completed = u["day"]
                 next_day(user_id)
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
-                    parse_mode="Markdown",
-                    reply_markup=get_main_keyboard()
-                )
+                if day_completed >= 90:
+                    await application.bot.send_message(
+                        chat_id=chat_id,
+                        text=(
+                            "🎉 Поздравляю с победой в Devil's 100 Challenge! 💪🔥\n"
+                            "Ты доказал(а), что сила — не только в мышцах, но и в характере.\n"
+                            "Каждое утро, каждый подход, каждая капля пота — это шаг к победе над собой.\n"
+                            "Ты — вдохновение для всех, кто стремится к дисциплине и самосовершенствованию! 🌟\n"
+                            "👏 Браво, чемпион! Пусть этот успех станет лишь началом новых достижений! 🚀\n"
+                            "🏆 #90днейсилы #ЖелезнаяВоля👊"
+                        ),
+                        parse_mode="Markdown",
+                        reply_markup=get_main_keyboard()
+                    )
+                else:
+                    await application.bot.send_message(
+                        chat_id=chat_id,
+                        text=f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
+                        parse_mode="Markdown",
+                        reply_markup=get_main_keyboard()
+                    )
             else:
                 fails = fail_day(user_id)
                 if fails < 3:
