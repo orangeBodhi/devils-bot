@@ -16,13 +16,22 @@ from telegram.ext import (
     ConversationHandler,
 )
 from db import (
-    init_db, add_user, get_user, reset_user, add_pushups,
-    get_pushups_today, next_day, fail_day, get_fails, get_day
+    init_db,
+    add_user,
+    get_user,
+    reset_user,
+    add_pushups,
+    get_pushups_today,
+    next_day,
+    fail_day,
+    get_fails,
+    get_day,
 )
 
-# States
+# Состояния для ConversationHandler
 CHOOSING_NAME, CHOOSING_START_TIME, CHOOSING_END_TIME, CHOOSING_REMINDERS = range(4)
 
+# Эмодзи
 DEVIL = "😈"
 CLOVER = "🍀"
 HEART_RED = "❤️"
@@ -49,7 +58,6 @@ def progress_bar(val, total, length, char="▇", empty="—"):
     return char * filled + empty * (length - filled)
 
 def emoji_number(num):
-    # Только для 1–9, иначе просто цифры
     emoji_digits = {
         '0': '0️⃣', '1': '1️⃣', '2': '2️⃣', '3': '3️⃣', '4': '4️⃣',
         '5': '5️⃣', '6': '6️⃣', '7': '7️⃣', '8': '8️⃣', '9': '9️⃣'
@@ -58,6 +66,123 @@ def emoji_number(num):
 
 def hearts(fails):
     return (HEART_RED * (3 - fails)) + (HEART_BLACK * fails)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.effective_user
+    user_db = get_user(user.id)
+    if user_db:
+        await update.message.reply_text(
+            f"Ты уже зарегистрирован! Напиши /reset, чтобы начать заново.", reply_markup=ReplyKeyboardRemove()
+        )
+        return ConversationHandler.END
+    keyboard = [[KeyboardButton("🚀 Начать челлендж")]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        f"Добро пожаловать в Devil's 100!\nНажмите кнопку ниже, чтобы начать регистрацию.",
+        reply_markup=reply_markup,
+    )
+    return CHOOSING_NAME
+
+async def choose_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Как к тебе обращаться? 📝")
+    return CHOOSING_START_TIME
+
+async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["name"] = update.message.text
+    await update.message.reply_text(
+        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 07:00), когда бот начинает работать (начало дня) и ты сможешь записывать свои отжимания🕒"
+    )
+    return CHOOSING_END_TIME
+
+async def save_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["start_time"] = update.message.text
+    await update.message.reply_text(
+        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 22:00), когда бот завершает работу (конец дня) 🕒 и ты больше не сможешь добавлять отжимания в этот день"
+    )
+    return CHOOSING_REMINDERS
+
+async def save_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["end_time"] = update.message.text
+    await update.message.reply_text(
+        "Сколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
+    )
+    return CHOOSING_REMINDERS
+
+async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        reminders = int(update.message.text)
+    except ValueError:
+        await update.message.reply_text("Пожалуйста, введи число (от 2 до 10)")
+        return CHOOSING_REMINDERS
+    if reminders < 2 or reminders > 10:
+        await update.message.reply_text("Число должно быть от 2 до 10")
+        return CHOOSING_REMINDERS
+    context.user_data["reminders"] = reminders
+    user = update.effective_user
+    add_user(
+        user.id,
+        context.user_data["name"],
+        context.user_data["start_time"],
+        context.user_data["end_time"],
+        context.user_data["reminders"]
+    )
+    await update.message.reply_text(
+        f"{DEVIL} Приветствую в Devil's 100 challenge! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return ConversationHandler.END
+
+async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if get_user(user.id):
+        reset_user(user.id)
+        await update.message.reply_text("Все данные сброшены! Можешь пройти регистрацию заново через /start.")
+    else:
+        await update.message.reply_text("Ты ещё не зарегистрирован!")
+
+async def add_pushups_generic(update, context, count):
+    user = update.effective_user
+    if not get_user(user.id):
+        await update.message.reply_text("Сначала зарегистрируйся через /start")
+        return
+    cur = get_pushups_today(user.id)
+    if cur >= 100:
+        await update.message.reply_text(f"Ты уже сделал сегодняшнюю сотку, отдохни! {CHILL}")
+        return
+    ok = add_pushups(user.id, count)
+    if not ok:
+        await update.message.reply_text("Нельзя добавить больше 100 отжиманий за день!")
+        return
+    new_count = get_pushups_today(user.id)
+    await update.message.reply_text(f"Отлично! {count} отжиманий добавлено к сегодняшнему прогрессу! {TROPHY}\nТекущий прогресс: {new_count}/100")
+    if new_count == 100:
+        await update.message.reply_text(f"Юху! сегодняшняя сотка сделана! {STRONG} 💯")
+
+async def add10(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 10)
+
+async def add15(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 15)
+
+async def add20(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 20)
+
+async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 25)
+
+async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Введите количество сделанных отжиманий (например, 13):")
+    context.user_data["awaiting_custom"] = True
+
+async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("awaiting_custom"):
+        try:
+            count = int(update.message.text)
+        except ValueError:
+            await update.message.reply_text("Пожалуйста, введите число.")
+            return
+        await add_pushups_generic(update, context, count)
+        context.user_data["awaiting_custom"] = False
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -68,7 +193,6 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     day = u["day"]
     fails = u["fails"]
     pushups = u["pushups_today"]
-    # Бары
     bar_days = progress_bar(day, 90, 3)
     bar_pushups = progress_bar(pushups, 100, 5)
     msg = (
@@ -94,7 +218,7 @@ async def check_end_of_day(user_id, update):
             )
         else:
             await update.message.reply_text(
-                f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя Devil's 100 challenge закончен… в этот раз!\nПоэтому, написав /reset ты можешь начать всё сначала! {ROAD}",
+                f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
                 reply_markup=ReplyKeyboardRemove()
             )
 
@@ -112,27 +236,6 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Поздравляю, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}"
         )
     await status(update, context)
-
-# Остальной код (start, reset, add10/15/20/25, add и т.д.) остаётся как был выше
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # ... (Оставьте код как был выше)
-    user = update.effective_user
-    user_db = get_user(user.id)
-    if user_db:
-        await update.message.reply_text(
-            f"Ты уже зарегистрирован! Напиши /reset, чтобы начать заново.", reply_markup=ReplyKeyboardRemove()
-        )
-        return ConversationHandler.END
-    keyboard = [[KeyboardButton("🚀 Начать челлендж")]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(
-        f"Добро пожаловать в Devil's 100!\nНажмите кнопку ниже, чтобы начать регистрацию.",
-        reply_markup=reply_markup,
-    )
-    return CHOOSING_NAME
-
-# ... (Оставьте остальные функции регистрации и добавления отжиманий как выше)
 
 def main():
     application = Application.builder().token(TOKEN).build()
