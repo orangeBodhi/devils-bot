@@ -56,9 +56,9 @@ init_db()
 
 def get_main_keyboard():
     keyboard = [
-        [KeyboardButton("/add10"), KeyboardButton("/add15")],
-        [KeyboardButton("/add20"), KeyboardButton("/add25")],
-        [KeyboardButton("/add"), KeyboardButton("/status")]
+        [KeyboardButton("🎯 +10 отжиманий"), KeyboardButton("🎯 +15 отжиманий")],
+        [KeyboardButton("🎯 +20 отжиманий"), KeyboardButton("🎯 +25 отжиманий")],
+        [KeyboardButton("🎲 Другое число"), KeyboardButton("🏅 Мой статус")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -200,6 +200,16 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardRemove()
     )
 
+def parse_pushup_command(text):
+    """Возвращает число если текст — одна из кнопок типа '🎯 +10 отжиманий', иначе None."""
+    mapping = {
+        "🎯 +10 отжиманий": 10,
+        "🎯 +15 отжиманий": 15,
+        "🎯 +20 отжиманий": 20,
+        "🎯 +25 отжиманий": 25
+    }
+    return mapping.get(text.strip(), None)
+
 async def add_pushups_generic(update, context, count):
     user = update.effective_user
     user_db = get_user(user.id)
@@ -255,9 +265,24 @@ async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):", reply_markup=get_main_keyboard())
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    # Если пользователь нажал на одну из кнопок с количеством — обрабатываем их напрямую
+    count = parse_pushup_command(text)
+    if count is not None:
+        await add_pushups_generic(update, context, count)
+        return
+    # Если пользователь выбрал кнопку "🎲 Другое число" — включаем режим кастомного ввода
+    if text == "🎲 Другое число":
+        await add_custom(update, context)
+        return
+    # Если пользователь выбрал "🏅 Мой статус" — показываем статус
+    if text == "🏅 Мой статус":
+        await status(update, context)
+        return
+    # Если ждем кастомное число
     if context.user_data.get("awaiting_custom"):
         try:
-            count = int(update.message.text)
+            count = int(text)
         except ValueError:
             await update.message.reply_text("Пожалуйста, введи число.", reply_markup=get_main_keyboard())
             return
