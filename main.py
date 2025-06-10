@@ -380,6 +380,230 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await status(update, context)
     return ConversationHandler.END
 
+async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    reset_user(user.id)
+    old_task = reminder_tasks.get(user.id)
+    if old_task:
+        old_task.cancel()
+        reminder_tasks.pop(user.id)
+    await update.message.reply_text(
+        "Все данные сброшены! Можешь пройти регистрацию заново через /start.",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
+def parse_pushup_command(text):
+    mapping = {
+        "🎯 +10 отжиманий": 10,
+        "🎯 +15 отжиманий": 15,
+        "🎯 +20 отжиманий": 20,
+        "🎯 +25 отжиманий": 25
+    }
+    return mapping.get(text.strip(), None)
+
+async def add_pushups_generic(update, context, count):
+    user = update.effective_user
+    user_db = get_user(user.id)
+    if not user_db:
+        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
+        return
+
+    user_name = user_db["username"] or user_db["name"] or "друг"
+    cur = user_db["pushups_today"]
+
+    if cur >= 100:
+        await update.message.reply_text(
+            "Нельзя добавить больше 100 отжиманий за день!",
+            reply_markup=get_main_keyboard()
+        )
+        return
+
+    ok = add_pushups(user.id, count)
+    new_count = get_pushups_today(user.id)
+
+    await update.message.reply_text(
+        f"Отлично! {emoji_number(count)} отжиманий добавлено к сегодняшнему прогрессу {UP}",
+        parse_mode="Markdown",
+        reply_markup=get_main_keyboard()
+    )
+    await update.message.reply_text(
+        f"Текущий прогресс: {emoji_number(new_count)}",
+        reply_markup=get_main_keyboard()
+    )
+    if new_count >= 100 and cur < 100:
+        await update.message.reply_text(
+            f"Юху! *{user_name}*, сегодняшняя сотка сделана! Поздравляю! {STRONG} 💯",
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard()
+        )
+
+async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["awaiting_custom"] = True
+    await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):", reply_markup=get_main_keyboard())
+
+async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    count = parse_pushup_command(text)
+    if count is not None:
+        await add_pushups_generic(update, context, count)
+        return
+    if text == "🎲 Другое число":
+        await add_custom(update, context)
+        return
+    if text == "🏅 Мой статус":
+        await status(update, context)
+        return
+    if text == f"{SETTINGS} Настройки":
+        await settings_entry(update, context)
+        return
+    if context.user_data.get("awaiting_custom"):
+        try:
+            count = int(text)
+        except ValueError:
+            await update.message.reply_text("Пожалуйста, введи число.", reply_markup=get_main_keyboard())
+            return
+        await add_pushups_generic(update, context, count)
+        context.user_data["awaiting_custom"] = False
+
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    u = get_user(user.id)
+    if not u:
+        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
+        return
+    day = u["day"]
+    fails = u["fails"]
+    pushups = u["pushups_today"]
+
+    bar_days = days_bar(day, 90, 5, "🟪", "⬜️")
+    bar_pushups = progress_bar(pushups, 100, 5, "🟩", "⬜️")
+    msg = (
+        f"DAY: {emoji_number(day)} {bar_days}\n\n"
+        f"PROGRESS: {emoji_number(pushups)} {bar_pushups}\n\n"
+        f"HEALTH: {hearts(fails)}"
+    )
+    await update.message.reply_text(msg, reply_markup=get_main_keyboard())
+
+async def check_end_of_day(user_id, update):
+    u = get_user(user_id)
+    user_name = u["username"] or u["name"] or "друг"
+    if u and u["pushups_today"] < 100:
+        fails = fail_day(user_id)
+        if fails < 3:
+            await update.message.reply_text(
+                f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
+        else:
+            await update.message.reply_text(
+                f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
+                reply_markup=ReplyKeyboardRemove(),
+                parse_mode="Markdown"
+            )
+
+async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    user = update.effective_user
+    u = get_user(user.id)
+    user_name = u["username"] or u["name"] or "друг"
+    if not u:
+        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
+        return
+    if u["pushups_today"] < 100:
+        await check_end_of_day(user.id, update)
+    else:
+        next_day(user.id)
+        await update.message.reply_text(
+            f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard()
+        )
+    await status(update, context)
+
+async def on_startup(application: Application):
+    for user_id in get_all_user_ids():
+        user = get_user(user_id)
+        if user:
+            chat_id = user_id
+            start_reminders(application, user_id, chat_id)
+
+async def add10(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 10)
+
+async def add15(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 15)
+
+async def add20(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 20)
+
+async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 25)
+
+async def cancel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        f"Все изменения отменены {CANCEL_EMOJI}",
+        reply_markup=get_main_keyboard()
+    )
+    return ConversationHandler.END
+
+async def settings_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    u = get_user(user.id)
+    start_time = u["start_time"] if u else "не задано"
+    await update.message.reply_text(
+        f"Изменить время начала дня? (текущее время: {start_time})",
+        reply_markup=get_yes_no_back_keyboard()
+    )
+    return SETTINGS_ASK_START
+
+async def settings_ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    answer = update.message.text
+    user = update.effective_user
+    u = get_user(user.id)
+    end_time = u["end_time"] if u else "не задано"
+
+    if answer == BACK:
+        return await cancel_settings(update, context)
+    if answer == "✅ Да":
+        await update.message.reply_text(
+            "Введи новое время начала дня в формате ЧЧ:ММ (например, 07:00):",
+            reply_markup=get_back_keyboard()
+        )
+        return SETTINGS_INPUT_START
+    else:
+        await update.message.reply_text(
+            f"Изменить время конца дня? (текущее время: {end_time})",
+            reply_markup=get_yes_no_back_keyboard()
+        )
+        return SETTINGS_ASK_END
+
+async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    time_text = update.message.text.strip()
+    if time_text == BACK:
+        return await cancel_settings(update, context)
+    if not is_valid_time(time_text):
+        await update.message.reply_text(
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00):",
+            reply_markup=get_back_keyboard()
+        )
+        return SETTINGS_INPUT_START
+    user_db = get_user(update.effective_user.id)
+    end_time = context.user_data.get("new_end_time") or user_db["end_time"]
+    if time_to_minutes(time_text) >= time_to_minutes(end_time):
+        await update.message.reply_text(
+            "Время конца дня должно быть позже времени начала дня! Попробуй снова.\nВведи новое время начала дня в формате ЧЧ:ММ (например, 07:00):",
+            reply_markup=get_back_keyboard()
+        )
+        return SETTINGS_INPUT_START
+    context.user_data["new_start_time"] = time_text
+    await update.message.reply_text(
+        f"Изменить время конца дня? (текущее время: {end_time})",
+        reply_markup=get_yes_no_back_keyboard()
+    )
+    return SETTINGS_ASK_END
+
 async def settings_ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = update.message.text
     user = update.effective_user
