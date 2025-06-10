@@ -61,6 +61,9 @@ SETTINGS = "⚙️"
 BACK = "⬅️ Назад"
 CANCEL_EMOJI = "🛑"
 
+# ADMIN ID for hidden test commands
+ADMIN_ID = 271278573
+
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
@@ -403,6 +406,9 @@ async def check_end_of_day(user_id, update):
             )
 
 async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Тестовая команда: только для ADMIN_ID
+    if update.effective_user.id != ADMIN_ID:
+        return
     user = update.effective_user
     u = get_user(user.id)
     user_name = u["username"] or u["name"] or "друг"
@@ -631,6 +637,35 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
+# === Скрытая команда для теста напоминаний через /settestreminders ===
+async def settestreminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    args = context.args
+    user = update.effective_user
+    if len(args) != 3:
+        await update.message.reply_text("Используй: /settestreminders <start> <end> <count>\nнапример: /settestreminders 15:11 15:14 3")
+        return
+    start_time, end_time, count_str = args
+    # Проверка формата времени
+    if not is_valid_time(start_time) or not is_valid_time(end_time):
+        await update.message.reply_text("Время должно быть в формате ЧЧ:ММ, например 15:11")
+        return
+    try:
+        count = int(count_str)
+    except Exception:
+        await update.message.reply_text("Количество напоминаний должно быть числом")
+        return
+    if count < 1 or count > 10:
+        await update.message.reply_text("Количество напоминаний — от 1 до 10")
+        return
+    update_user_settings(user.id, start_time, end_time, count)
+    start_reminders(context.application, user.id, update.effective_chat.id)
+    await update.message.reply_text(
+        f"Тестовые напоминания установлены:\nНачало: {start_time}\nКонец: {end_time}\nКол-во: {count}",
+        reply_markup=get_main_keyboard()
+    )
+
 def main():
     application = Application.builder().token(TOKEN).build()
 
@@ -663,9 +698,13 @@ def main():
 
     application.add_handler(conv_handler)
     application.add_handler(settings_conv)
+
+    # Тестовые команды только для админа
+    application.add_handler(CommandHandler("addday", addday))
+    application.add_handler(CommandHandler("settestreminders", settestreminders))
+
     application.add_handler(CommandHandler("reset", reset))
     application.add_handler(CommandHandler("status", status))
-    application.add_handler(CommandHandler("addday", addday))
     application.add_handler(CommandHandler("add10", add10))
     application.add_handler(CommandHandler("add15", add15))
     application.add_handler(CommandHandler("add20", add20))
