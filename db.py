@@ -102,3 +102,10 @@ def get_fails(user_id):
 def get_day(user_id):
     user = get_user(user_id)
     return user["day"] if user else 1
+
+def get_all_user_ids():
+    """Получить список всех user_id из таблицы users (для запуска напоминалок при старте бота)."""
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT user_id FROM users")
+        return [row["user_id"] for row in c.fetchall()]
