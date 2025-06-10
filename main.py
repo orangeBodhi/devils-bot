@@ -190,7 +190,7 @@ async def add_pushups_generic(update, context, count):
     if not user_db:
         await update.message.reply_text("Сначала зарегистрируйся через /start")
         return
-    user_name = user_db.get("username") or user_db.get("name") or "друг"
+    user_name = user_db["username"] or user_db["name"] or "друг"
     cur = user_db["pushups_today"]
     if cur >= 100:
         await update.message.reply_text(f"Ты уже сделал сегодняшнюю сотку, отдохни! {CHILL}")
@@ -207,7 +207,7 @@ async def add_pushups_generic(update, context, count):
     )
     # Можно добавить прогресс (не обязательно, но полезно)
     await update.message.reply_text(
-    f"Текущий прогресс: {emoji_number(new_count)}/100"
+        f"Текущий прогресс: {emoji_number(new_count)}/100"
     )
     if new_count == 100:
         await update.message.reply_text(
@@ -267,7 +267,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def check_end_of_day(user_id, update):
     u = get_user(user_id)
-    user_name = u.get("username") or u.get("name") or "друг"
+    user_name = u["username"] or u["name"] or "друг"
     if u and u["pushups_today"] < 100:
         fails = fail_day(user_id)
         if fails < 3:
@@ -285,7 +285,7 @@ async def check_end_of_day(user_id, update):
 async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     u = get_user(user.id)
-    user_name = u.get("username") or u.get("name") or "друг"
+    user_name = u["username"] or u["name"] or "друг"
     if not u:
         await update.message.reply_text("Сначала зарегистрируйся через /start")
         return
