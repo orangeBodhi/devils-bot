@@ -30,7 +30,7 @@ from db import (
     get_fails,
     get_day,
     get_all_user_ids,
-    update_user_settings,   # Важно! Импортируем для настроек
+    update_user_settings,
 )
 
 ASK_NAME, ASK_START_TIME, ASK_END_TIME, ASK_REMINDERS = range(4)
@@ -433,14 +433,20 @@ async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # === НАСТРОЙКИ ===
 
 async def settings_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    u = get_user(user.id)
+    start_time = u["start_time"] if u else "не задано"
     await update.message.reply_text(
-        "Изменить время начала дня?",
+        f"Изменить время начала дня? (текущее время: {start_time})",
         reply_markup=get_yes_no_keyboard()
     )
     return SETTINGS_ASK_START
 
 async def settings_ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = update.message.text
+    user = update.effective_user
+    u = get_user(user.id)
+    end_time = u["end_time"] if u else "не задано"
     if answer == "✅ Да":
         await update.message.reply_text(
             "Введи новое время начала дня в формате ЧЧ:ММ (например, 07:00):",
@@ -450,7 +456,7 @@ async def settings_ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         context.user_data["new_start_time"] = None
         await update.message.reply_text(
-            "Изменить время конца дня?",
+            f"Изменить время конца дня? (текущее время: {end_time})",
             reply_markup=get_yes_no_keyboard()
         )
         return SETTINGS_ASK_END
@@ -471,13 +477,16 @@ async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYP
         return SETTINGS_INPUT_START
     context.user_data["new_start_time"] = time_text
     await update.message.reply_text(
-        "Изменить время конца дня?",
+        f"Изменить время конца дня? (текущее время: {end_time})",
         reply_markup=get_yes_no_keyboard()
     )
     return SETTINGS_ASK_END
 
 async def settings_ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = update.message.text
+    user = update.effective_user
+    u = get_user(user.id)
+    reminders = u["reminders"] if u else "не задано"
     if answer == "✅ Да":
         await update.message.reply_text(
             "Введи новое время конца дня в формате ЧЧ:ММ (например, 22:00):",
@@ -487,7 +496,7 @@ async def settings_ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         context.user_data["new_end_time"] = None
         await update.message.reply_text(
-            "Изменить количество напоминаний?",
+            f"Изменить количество напоминаний? (текущее количество: {reminders})",
             reply_markup=get_yes_no_keyboard()
         )
         return SETTINGS_ASK_REMINDERS
@@ -507,8 +516,9 @@ async def settings_input_end(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return SETTINGS_INPUT_END
     context.user_data["new_end_time"] = time_text
+    reminders = user_db["reminders"] if user_db else "не задано"
     await update.message.reply_text(
-        "Изменить количество напоминаний?",
+        f"Изменить количество напоминаний? (текущее количество: {reminders})",
         reply_markup=get_yes_no_keyboard()
     )
     return SETTINGS_ASK_REMINDERS
