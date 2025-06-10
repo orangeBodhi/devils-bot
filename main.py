@@ -62,9 +62,14 @@ def get_main_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-def progress_bar(val, total, length, char="▇", empty="—"):
+def progress_bar(val, total, length=10, char_full="🟩", char_empty="⬜️"):
+    """Графический прогресс-бар с цветными эмодзи и %."""
+    val = max(0, min(val, total))
     filled = int(round(length * val / float(total)))
-    return char * filled + empty * (length - filled)
+    empty = length - filled
+    percent = int(round(100 * val / float(total)))
+    bar = (char_full * filled) + (char_empty * empty)
+    return f"{bar} {percent}%"
 
 def emoji_number(num):
     emoji_digits = {
@@ -260,7 +265,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fails = u["fails"]
     pushups = u["pushups_today"]
     bar_days = progress_bar(day, 90, 3)
-    bar_pushups = progress_bar(pushups, 100, 5)
+    bar_pushups = progress_bar(pushups, 100, 10)  # 10 делений, цветные эмодзи и %
     msg = (
         f"DAY: {emoji_number(day)} {bar_days}\n"
         f"PROGRESS: {emoji_number(pushups)} {bar_pushups}\n"
