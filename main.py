@@ -46,6 +46,7 @@ TROPHY = "🏆"
 CHILL = "🧘"
 SKULL = "💀"
 ROAD = "🛣️"
+UP = "📈"
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -175,9 +176,8 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
-    # Сразу же выводим /status с той же клавиатурой
     await status(update, context)
-    return ConversationHandler.END #
+    return ConversationHandler.END
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -200,11 +200,15 @@ async def add_pushups_generic(update, context, count):
         await update.message.reply_text("Нельзя добавить больше 100 отжиманий за день!")
         return
     new_count = get_pushups_today(user.id)
+    # Главное сообщение ТЗ: "Отлично! ХХ (емодзи-числами) отжиманий добавлено к сегодняшнему прогрессу (📈)"
     await update.message.reply_text(
-        f"Отлично, *{user_name}*! {count} отжиманий добавлено к сегодняшнему прогрессу! {TROPHY}\n"
-        f"Текущий прогресс: {new_count}/100",
+        f"Отлично! {emoji_number(count)} отжиманий добавлено к сегодняшнему прогрессу {UP}",
         parse_mode="Markdown"
     )
+    # Можно добавить прогресс (не обязательно, но полезно)
+    # await update.message.reply_text(
+    #     f"Текущий прогресс: {emoji_number(new_count)}/100"
+    # )
     if new_count == 100:
         await update.message.reply_text(
             f"Юху! *{user_name}*, сегодняшняя сотка сделана! Поздравляю! {STRONG} 💯",
@@ -228,9 +232,6 @@ async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):")
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("handle_custom_pushups called")
-    if context.user_data.get("awaiting_custom"):
-        print("awaiting_custom is True")
     if context.user_data.get("awaiting_custom"):
         try:
             count = int(update.message.text)
