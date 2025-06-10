@@ -32,7 +32,6 @@ def add_user(user_id, name, start_time, end_time, reminders, username=None):
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM users WHERE user_id=?", (user_id,))
     if cur.fetchone():
-        # Пользователь уже есть, не трогать!
         return
     cur.execute(
         """
@@ -71,7 +70,6 @@ def add_pushups(user_id, count):
         return False
     today_str = date.today().isoformat()
     if u["last_date"] != today_str:
-        # Новый день — сбросить прогресс дня, увеличить day на 1
         pushups = 0
         day = u["day"] + 1
         fails = u["fails"]
