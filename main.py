@@ -373,7 +373,7 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     else:
         await update.message.reply_text(
             f"{DEVIL} Поздравляю с регистрацией в Devil's 100 challenge, *{user_name}*! Ожидай начала первого дня согласно настройкам (в момент начала дня, который ты установил при регистрации, и стартует челлендж!) Увидимся! 👋",
-            reply_markup=get_main_keyboard(),
+            reply_markup=get_settings_only_keyboard(),
             parse_mode="Markdown"
         )
 
