@@ -28,9 +28,6 @@ def init_db():
     conn.commit()
 
 def add_user(user_id, name, start_time, end_time, reminders, username=None):
-    """
-    Создать нового пользователя. Если пользователь уже есть — ничего не делать.
-    """
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM users WHERE user_id=?", (user_id,))
@@ -47,9 +44,6 @@ def add_user(user_id, name, start_time, end_time, reminders, username=None):
     conn.commit()
 
 def update_user_settings(user_id, start_time, end_time, reminders):
-    """
-    Обновить только настройки пользователя, не трогая прогресс, день и жизни.
-    """
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -66,18 +60,12 @@ def get_user(user_id):
     return dict(row) if row else None
 
 def reset_user(user_id):
-    """
-    Полный сброс пользователя (как новая регистрация)
-    """
     conn = get_db()
     cur = conn.cursor()
     cur.execute("DELETE FROM users WHERE user_id=?", (user_id,))
     conn.commit()
 
 def add_pushups(user_id, count):
-    """
-    Добавляет count отжиманий к сегодняшним, максимум 100.
-    """
     u = get_user(user_id)
     if not u:
         return False
@@ -86,7 +74,7 @@ def add_pushups(user_id, count):
         # Новый день — сбросить прогресс дня, увеличить day на 1
         pushups = 0
         day = u["day"] + 1
-        fails = u["fails"]  # Не сбрасываем жизни
+        fails = u["fails"]
     else:
         pushups = u["pushups_today"]
         day = u["day"]
@@ -111,9 +99,6 @@ def get_pushups_today(user_id):
     return u["pushups_today"]
 
 def next_day(user_id):
-    """
-    Переключить пользователя на следующий день и обнулить прогресс дня
-    """
     u = get_user(user_id)
     if not u:
         return
@@ -127,10 +112,6 @@ def next_day(user_id):
     conn.commit()
 
 def fail_day(user_id):
-    """
-    Добавить фейл (минус жизнь) и перейти на следующий день
-    Возвращает новое число fails
-    """
     u = get_user(user_id)
     if not u:
         return 0
