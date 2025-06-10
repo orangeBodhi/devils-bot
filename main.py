@@ -153,6 +153,10 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return ASK_REMINDERS
     context.user_data["reminders"] = reminders
     user = update.effective_user
+
+    # Получаем имя пользователя для приветствия
+    user_name = context.user_data.get("name", "друг")
+
     add_user(
         user.id,
         context.user_data["name"],
@@ -161,7 +165,6 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data["reminders"]
     )
 
-    # Клавиатура с быстрыми кнопками и статусом
     keyboard = [
         [KeyboardButton("/add10"), KeyboardButton("/add15")],
         [KeyboardButton("/add20"), KeyboardButton("/add25")],
@@ -171,7 +174,8 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await update.message.reply_text(
         f"{DEVIL} Приветствую в Devil's 100 challenge, *{user_name}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
     )
     # Сразу же выводим /status с той же клавиатурой
     await status(update, context)
@@ -188,7 +192,7 @@ async def add_pushups_generic(update, context, count):
     if not user_db:
         await update.message.reply_text("Сначала зарегистрируйся через /start")
         return
-    user_name = user_db["username"] if user_db.get("username") else "друг"
+    user_name = user_db.get("username") or user_db.get("name") or "друг"
     cur = user_db["pushups_today"]
     if cur >= 100:
         await update.message.reply_text(f"Ты уже сделал сегодняшнюю сотку, отдохни! {CHILL}")
@@ -208,7 +212,6 @@ async def add_pushups_generic(update, context, count):
             f"Юху! *{user_name}*, сегодняшняя сотка сделана! Поздравляю! {STRONG} 💯",
             parse_mode="Markdown"
         )
-
 
 async def add10(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await add_pushups_generic(update, context, 10)
@@ -262,21 +265,25 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def check_end_of_day(user_id, update):
     u = get_user(user_id)
+    user_name = u.get("username") or u.get("name") or "друг"
     if u and u["pushups_today"] < 100:
         fails = fail_day(user_id)
         if fails < 3:
             await update.message.reply_text(
-                f"Па-па-па… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}"
+                f"Па-па-па… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
+                parse_mode="Markdown"
             )
         else:
             await update.message.reply_text(
                 f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
-                reply_markup=ReplyKeyboardRemove()
+                reply_markup=ReplyKeyboardRemove(),
+                parse_mode="Markdown"
             )
 
 async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     u = get_user(user.id)
+    user_name = u.get("username") or u.get("name") or "друг"
     if not u:
         await update.message.reply_text("Сначала зарегистрируйся через /start")
         return
@@ -285,7 +292,8 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         next_day(user.id)
         await update.message.reply_text(
-            f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}"
+            f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
+            parse_mode="Markdown"
         )
     await status(update, context)
 
