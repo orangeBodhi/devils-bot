@@ -29,7 +29,7 @@ from db import (
 )
 
 # Состояния для ConversationHandler
-CHOOSING_NAME, CHOOSING_START_TIME, CHOOSING_END_TIME, CHOOSING_REMINDERS = range(4)
+ASK_NAME, ASK_START_TIME, ASK_END_TIME, ASK_REMINDERS = range(4)
 
 # Эмодзи
 DEVIL = "😈"
@@ -75,48 +75,41 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             f"Ты уже зарегистрирован! Напиши /reset, чтобы начать заново.", reply_markup=ReplyKeyboardRemove()
         )
         return ConversationHandler.END
-    keyboard = [[KeyboardButton("🚀 Начать челлендж")]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
-        f"Добро пожаловать в Devil's 100!\nНажмите кнопку ниже, чтобы начать регистрацию.",
-        reply_markup=reply_markup,
+        "Как к тебе обращаться? 📝"
     )
-    return CHOOSING_NAME
+    return ASK_NAME
 
-async def choose_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Как к тебе обращаться? 📝")
-    return CHOOSING_START_TIME
-
-async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def ask_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["name"] = update.message.text
     await update.message.reply_text(
         "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 07:00), когда бот начинает работать (начало дня) и ты сможешь записывать свои отжимания🕒"
     )
-    return CHOOSING_END_TIME
+    return ASK_END_TIME
 
-async def save_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def ask_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["start_time"] = update.message.text
     await update.message.reply_text(
         "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 22:00), когда бот завершает работу (конец дня) 🕒 и ты больше не сможешь добавлять отжимания в этот день"
     )
-    return CHOOSING_REMINDERS
+    return ASK_REMINDERS
 
-async def save_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["end_time"] = update.message.text
     await update.message.reply_text(
         "Сколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
     )
-    return CHOOSING_REMINDERS
+    return ConversationHandler.END
 
 async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         reminders = int(update.message.text)
     except ValueError:
         await update.message.reply_text("Пожалуйста, введи число (от 2 до 10)")
-        return CHOOSING_REMINDERS
+        return ASK_REMINDERS
     if reminders < 2 or reminders > 10:
         await update.message.reply_text("Число должно быть от 2 до 10")
-        return CHOOSING_REMINDERS
+        return ASK_REMINDERS
     context.user_data["reminders"] = reminders
     user = update.effective_user
     add_user(
@@ -241,15 +234,12 @@ def main():
     application = Application.builder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler("start", start),
-            MessageHandler(filters.Regex("🚀 Начать челлендж"), choose_name),
-        ],
+        entry_points=[CommandHandler("start", start)],
         states={
-            CHOOSING_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name)],
-            CHOOSING_START_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_start_time)],
-            CHOOSING_END_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_end_time)],
-            CHOOSING_REMINDERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_reminders)],
+            ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_start_time)],
+            ASK_START_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_end_time)],
+            ASK_END_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_reminders)],
+            ASK_REMINDERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_reminders)],
         },
         fallbacks=[CommandHandler("start", start)],
     )
