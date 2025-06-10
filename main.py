@@ -235,11 +235,30 @@ async def send_reminders_loop(application, user_id, chat_id):
                     text="Эй! Ты не забыл про челлендж? Отожмись! 💪",
                     reply_markup=get_main_keyboard()
                 )
-            # --- Дожидаемся конца дня ---
-            end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
-            seconds_to_end = (end_dt - datetime.now(KIEV_TZ)).total_seconds()
-            if seconds_to_end > 0:
-                await asyncio.sleep(seconds_to_end)
+            # --- Экстра уведомление за 15 минут до конца дня ---
+            reminder_15min_dt = end_dt - timedelta(minutes=15)
+            now = datetime.now(KIEV_TZ)
+            if reminder_15min_dt > now:
+                seconds_to_15min = (reminder_15min_dt - now).total_seconds()
+                await asyncio.sleep(seconds_to_15min)
+                pushups = get_pushups_today(user_id)
+                if pushups < 100:
+                    user_name = u["username"] or u["name"] or "друг"
+                    await application.bot.send_message(
+                        chat_id=chat_id,
+                        text=f"Осталось 15 минут до конца дня! Или увеличь в настройках 'конец дня' или доделай отжимания. За работу, {user_name}! 👊",
+                        reply_markup=get_main_keyboard()
+                    )
+                # Ждём до конца дня
+                seconds_to_end = (end_dt - datetime.now(KIEV_TZ)).total_seconds()
+                if seconds_to_end > 0:
+                    await asyncio.sleep(seconds_to_end)
+            else:
+                # Уже меньше 15 минут до конца дня, просто ждём до конца дня
+                seconds_to_end = (end_dt - now).total_seconds()
+                if seconds_to_end > 0:
+                    await asyncio.sleep(seconds_to_end)
+            # --- Итог дня ---
             u = get_user(user_id)
             if u:
                 user_name = u["username"] or u["name"] or "друг"
