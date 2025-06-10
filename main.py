@@ -4,6 +4,7 @@ import re
 import asyncio
 from datetime import datetime, timedelta, time as dt_time
 from dotenv import load_dotenv
+from pytz import timezone
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
@@ -73,6 +74,8 @@ logger = logging.getLogger(__name__)
 init_db()
 
 reminder_tasks = {}
+
+KIEV_TZ = timezone("Europe/Kyiv")
 
 def get_main_keyboard():
     keyboard = [
@@ -164,15 +167,15 @@ async def send_reminders_loop(application, user_id, chat_id):
         reminders_count = u["reminders"]
         times = get_reminder_times(start_time, end_time, reminders_count)
 
-        now = datetime.now()
+        now = datetime.now(KIEV_TZ)
         today = now.date()
         reminder_datetimes = []
         for t in times:
-            reminder_dt = datetime.combine(today, t)
+            reminder_dt = KIEV_TZ.localize(datetime.combine(today, t))
             if reminder_dt > now:
                 reminder_datetimes.append(reminder_dt)
         for reminder_dt in reminder_datetimes:
-            seconds = (reminder_dt - datetime.now()).total_seconds()
+            seconds = (reminder_dt - datetime.now(KIEV_TZ)).total_seconds()
             if seconds > 0:
                 await asyncio.sleep(seconds)
             pushups = get_pushups_today(user_id)
@@ -183,8 +186,8 @@ async def send_reminders_loop(application, user_id, chat_id):
                 text="Эй! Ты не забыл про челлендж? Отожмись! 💪",
                 reply_markup=get_main_keyboard()
             )
-        tomorrow = datetime.combine(now.date() + timedelta(days=1), dt_time(0,0))
-        await asyncio.sleep((tomorrow - datetime.now()).total_seconds())
+        tomorrow = KIEV_TZ.localize(datetime.combine(now.date() + timedelta(days=1), dt_time(0,0)))
+        await asyncio.sleep((tomorrow - datetime.now(KIEV_TZ)).total_seconds())
 
 def start_reminders(application, user_id, chat_id):
     old_task = reminder_tasks.get(user_id)
@@ -480,7 +483,6 @@ async def settings_ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return SETTINGS_INPUT_START
     else:
-        # Не трогаем context.user_data["new_start_time"]
         await update.message.reply_text(
             f"Изменить время конца дня? (текущее время: {end_time})",
             reply_markup=get_yes_no_back_keyboard()
@@ -527,7 +529,6 @@ async def settings_ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return SETTINGS_INPUT_END
     else:
-        # Не трогаем context.user_data["new_end_time"]
         await update.message.reply_text(
             f"Изменить количество напоминаний? (текущее количество: {reminders})",
             reply_markup=get_yes_no_back_keyboard()
@@ -571,7 +572,6 @@ async def settings_ask_reminders(update: Update, context: ContextTypes.DEFAULT_T
         )
         return SETTINGS_INPUT_REMINDERS
     else:
-        # Не трогаем context.user_data["new_reminders"]
         return await settings_apply(update, context)
 
 async def settings_input_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -602,7 +602,6 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
         return ConversationHandler.END
 
-    # Главное изменение: проверяем наличие КЛЮЧА, а не значения!
     keys = context.user_data.keys()
     if not any(k in keys for k in ["new_start_time", "new_end_time", "new_reminders"]):
         await update.message.reply_text(
@@ -644,7 +643,6 @@ async def settestreminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Используй: /settestreminders <start> <end> <count>\nнапример: /settestreminders 15:11 15:14 3")
         return
     start_time, end_time, count_str = args
-    # Проверка формата времени
     if not is_valid_time(start_time) or not is_valid_time(end_time):
         await update.message.reply_text("Время должно быть в формате ЧЧ:ММ, например 15:11")
         return
@@ -695,11 +693,8 @@ def main():
 
     application.add_handler(conv_handler)
     application.add_handler(settings_conv)
-
-    # Тестовые команды только для админа
     application.add_handler(CommandHandler("addday", addday))
     application.add_handler(CommandHandler("settestreminders", settestreminders))
-
     application.add_handler(CommandHandler("reset", reset))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("add10", add10))
