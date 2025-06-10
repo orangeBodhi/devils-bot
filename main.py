@@ -226,10 +226,10 @@ async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await add_pushups_generic(update, context, 25)
 
 async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):")
     context.user_data["awaiting_custom"] = True
+    await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):")
 
-async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+aasync def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("awaiting_custom"):
         try:
             count = int(update.message.text)
@@ -238,7 +238,7 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
             return
         await add_pushups_generic(update, context, count)
         context.user_data["awaiting_custom"] = False
-
+        
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     u = get_user(user.id)
