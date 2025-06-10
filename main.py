@@ -461,6 +461,15 @@ async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYP
             "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00):"
         )
         return SETTINGS_INPUT_START
+    # Проверка: новое начало дня должно быть раньше конца дня
+    # Для этого сравниваем с новым или текущим концом дня
+    user_db = get_user(update.effective_user.id)
+    end_time = context.user_data.get("new_end_time") or user_db["end_time"]
+    if time_to_minutes(time_text) >= time_to_minutes(end_time):
+        await update.message.reply_text(
+            "Время конца дня должно быть позже времени начала дня! Попробуй снова.\nВведи новое время начала дня в формате ЧЧ:ММ (например, 07:00):"
+        )
+        return SETTINGS_INPUT_START
     context.user_data["new_start_time"] = time_text
     await update.message.reply_text(
         "Изменить время конца дня?",
@@ -489,6 +498,14 @@ async def settings_input_end(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not is_valid_time(time_text):
         await update.message.reply_text(
             "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00):"
+        )
+        return SETTINGS_INPUT_END
+    # Проверка: новое конец дня должно быть позже начала дня
+    user_db = get_user(update.effective_user.id)
+    start_time = context.user_data.get("new_start_time") or user_db["start_time"]
+    if time_to_minutes(time_text) <= time_to_minutes(start_time):
+        await update.message.reply_text(
+            "Время конца дня должно быть позже времени начала дня! Попробуй снова.\nВведи новое время конца дня в формате ЧЧ:ММ (например, 22:00):"
         )
         return SETTINGS_INPUT_END
     context.user_data["new_end_time"] = time_text
@@ -537,6 +554,18 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_end_time = context.user_data.get("new_end_time")
     new_reminders = context.user_data.get("new_reminders")
 
+    start_time = new_start_time if new_start_time else user_db["start_time"]
+    end_time = new_end_time if new_end_time else user_db["end_time"]
+    reminders = new_reminders if new_reminders else user_db["reminders"]
+
+    # Проверка: время конца дня должно быть позже времени начала дня!
+    if time_to_minutes(end_time) <= time_to_minutes(start_time):
+        await update.message.reply_text(
+            "Время конца дня должно быть позже времени начала дня! Изменения не сохранены.",
+            reply_markup=get_main_keyboard()
+        )
+        return ConversationHandler.END
+
     # Если ничего не выбрано для изменения
     if not any([new_start_time, new_end_time, new_reminders]):
         await update.message.reply_text(
@@ -544,15 +573,6 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_main_keyboard()
         )
         return ConversationHandler.END
-
-    # Выставляем старые значения если не меняли
-    start_time = new_start_time if new_start_time else user_db["start_time"]
-    end_time = new_end_time if new_end_time else user_db["end_time"]
-    reminders = new_reminders if new_reminders else user_db["reminders"]
-
-    # Сохраняем новые значения
-    with open("devils100.db", "rb"):
-        pass  # just to avoid accidental typo; you can remove this line.
 
     add_user(user.id, user_db["username"], start_time, end_time, reminders)
 
