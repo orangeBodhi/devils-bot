@@ -197,14 +197,22 @@ async def send_reminders_loop(application, user_id, chat_id):
         if now < start_dt:
             await asyncio.sleep((start_dt - now).total_seconds())
         u = get_user(user_id)
-        if u and u["day"] > 1:
-            day_num = u["day"]
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит ты должен сделать очередные 100 отжиманий! Удачи! {CLOVER}",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard()
-            )
+       if u:
+    day_num = u["day"]
+    if day_num == 1:
+        await application.bot.send_message(
+            chat_id=chat_id,
+            text=f"{DEVIL} Приветствую в Devil's 100 challenge, *{u['username'] or u['name'] or 'друг'}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard()
+        )
+    else:
+        await application.bot.send_message(
+            chat_id=chat_id,
+            text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит ты должен сделать очередные 100 отжиманий! Удачи! {CLOVER}",
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard()
+        )
         times = get_reminder_times(start_time, end_time, reminders_count)
         now = datetime.now(KIEV_TZ)
         today = now.date()
