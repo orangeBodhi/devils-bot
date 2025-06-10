@@ -30,6 +30,7 @@ from db import (
     get_fails,
     get_day,
     get_all_user_ids,
+    update_user_settings,   # Важно! Импортируем для настроек
 )
 
 ASK_NAME, ASK_START_TIME, ASK_END_TIME, ASK_REMINDERS = range(4)
@@ -461,8 +462,6 @@ async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYP
             "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00):"
         )
         return SETTINGS_INPUT_START
-    # Проверка: новое начало дня должно быть раньше конца дня
-    # Для этого сравниваем с новым или текущим концом дня
     user_db = get_user(update.effective_user.id)
     end_time = context.user_data.get("new_end_time") or user_db["end_time"]
     if time_to_minutes(time_text) >= time_to_minutes(end_time):
@@ -500,7 +499,6 @@ async def settings_input_end(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00):"
         )
         return SETTINGS_INPUT_END
-    # Проверка: новое конец дня должно быть позже начала дня
     user_db = get_user(update.effective_user.id)
     start_time = context.user_data.get("new_start_time") or user_db["start_time"]
     if time_to_minutes(time_text) <= time_to_minutes(start_time):
@@ -558,7 +556,6 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     end_time = new_end_time if new_end_time else user_db["end_time"]
     reminders = new_reminders if new_reminders else user_db["reminders"]
 
-    # Проверка: время конца дня должно быть позже времени начала дня!
     if time_to_minutes(end_time) <= time_to_minutes(start_time):
         await update.message.reply_text(
             "Время конца дня должно быть позже времени начала дня! Изменения не сохранены.",
@@ -566,7 +563,6 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
 
-    # Если ничего не выбрано для изменения
     if not any([new_start_time, new_end_time, new_reminders]):
         await update.message.reply_text(
             "Изменения не внесены.",
@@ -574,9 +570,8 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
 
-    add_user(user.id, user_db["username"], start_time, end_time, reminders)
+    update_user_settings(user.id, start_time, end_time, reminders)
 
-    # Перезапуск напоминалок
     start_reminders(context.application, user.id, update.effective_chat.id)
 
     await update.message.reply_text(
