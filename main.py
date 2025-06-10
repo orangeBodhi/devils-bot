@@ -29,10 +29,18 @@ from db import (
     fail_day,
     get_fails,
     get_day,
-    get_all_user_ids,  # <-- обязательно импортируй!
+    get_all_user_ids,
 )
 
 ASK_NAME, ASK_START_TIME, ASK_END_TIME, ASK_REMINDERS = range(4)
+(
+    SETTINGS_ASK_START,
+    SETTINGS_INPUT_START,
+    SETTINGS_ASK_END,
+    SETTINGS_INPUT_END,
+    SETTINGS_ASK_REMINDERS,
+    SETTINGS_INPUT_REMINDERS,
+) = range(10, 16)
 
 DEVIL = "😈"
 CLOVER = "🍀"
@@ -47,6 +55,7 @@ CHILL = "🧘"
 SKULL = "💀"
 ROAD = "🛣️"
 UP = "📈"
+SETTINGS = "⚙️"
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -56,16 +65,22 @@ logger = logging.getLogger(__name__)
 
 init_db()
 
-# Для хранения задач напоминаний по user_id
 reminder_tasks = {}
 
 def get_main_keyboard():
     keyboard = [
         [KeyboardButton("🎯 +10 отжиманий"), KeyboardButton("🎯 +15 отжиманий")],
         [KeyboardButton("🎯 +20 отжиманий"), KeyboardButton("🎯 +25 отжиманий")],
-        [KeyboardButton("🎲 Другое число"), KeyboardButton("🏅 Мой статус")]
+        [KeyboardButton("🎲 Другое число"), KeyboardButton("🏅 Мой статус")],
+        [KeyboardButton(f"{SETTINGS} Настройки")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+def get_yes_no_keyboard():
+    keyboard = [
+        [KeyboardButton("✅ Да"), KeyboardButton("❌ Нет")]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 def progress_bar(val, total, length=5, char_full="🟩", char_empty="⬜️"):
     val = max(0, min(val, total))
@@ -112,7 +127,6 @@ def minutes_to_time(mins):
     return dt_time(hour=h, minute=m)
 
 def get_reminder_times(start_time_str, end_time_str, reminders_count):
-    """Вернёт список времени напоминаний в формате [datetime.time, ...] равномерно между стартом и концом."""
     start_dt = datetime.strptime(start_time_str, "%H:%M")
     end_dt = datetime.strptime(end_time_str, "%H:%M")
     total_minutes = int((end_dt - start_dt).total_seconds() // 60)
@@ -127,12 +141,10 @@ def get_reminder_times(start_time_str, end_time_str, reminders_count):
     return times
 
 async def send_reminders_loop(application, user_id, chat_id):
-    """Фоновая задача на каждый день: отправлять напоминания по расписанию, если челлендж не завершён."""
     while True:
         u = get_user(user_id)
         if not u:
             return
-        # Получаем расписание
         start_time = u["start_time"]
         end_time = u["end_time"]
         reminders_count = u["reminders"]
@@ -140,34 +152,27 @@ async def send_reminders_loop(application, user_id, chat_id):
 
         now = datetime.now()
         today = now.date()
-        # Считаем datetime для всех напоминаний на сегодня
         reminder_datetimes = []
         for t in times:
             reminder_dt = datetime.combine(today, t)
             if reminder_dt > now:
                 reminder_datetimes.append(reminder_dt)
-        # Запускаем отправку напоминаний на сегодня
         for reminder_dt in reminder_datetimes:
             seconds = (reminder_dt - datetime.now()).total_seconds()
             if seconds > 0:
                 await asyncio.sleep(seconds)
-            # Проверяем, нужно ли отправлять (100 сделано - не отправляем)
             pushups = get_pushups_today(user_id)
             if pushups >= 100:
                 continue
-            # Отправляем напоминание
             await application.bot.send_message(
                 chat_id=chat_id,
                 text="Эй! Ты не забыл про челлендж? Отожмись! 💪",
                 reply_markup=get_main_keyboard()
             )
-        # Спим до полуночи
         tomorrow = datetime.combine(now.date() + timedelta(days=1), dt_time(0,0))
         await asyncio.sleep((tomorrow - datetime.now()).total_seconds())
 
 def start_reminders(application, user_id, chat_id):
-    """Запустить фоновую задачу напоминаний для пользователя."""
-    # Если уже есть задача для этого пользователя — отменяем
     old_task = reminder_tasks.get(user_id)
     if old_task:
         old_task.cancel()
@@ -260,7 +265,6 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reply_markup=get_main_keyboard(),
         parse_mode="Markdown"
     )
-    # Запустить напоминалки!
     start_reminders(context.application, user.id, update.effective_chat.id)
     await status(update, context)
     return ConversationHandler.END
@@ -268,7 +272,6 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     reset_user(user.id)
-    # Остановить напоминалки
     old_task = reminder_tasks.get(user.id)
     if old_task:
         old_task.cancel()
@@ -339,6 +342,9 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
     if text == "🏅 Мой статус":
         await status(update, context)
         return
+    if text == f"{SETTINGS} Настройки":
+        await settings_entry(update, context)
+        return
     if context.user_data.get("awaiting_custom"):
         try:
             count = int(text)
@@ -404,14 +410,13 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await status(update, context)
 
 async def on_startup(application: Application):
-    # Фоновый запуск напоминалок для всех пользователей (без run_async!)
     for user_id in get_all_user_ids():
         user = get_user(user_id)
         if user:
             chat_id = user_id
             start_reminders(application, user_id, chat_id)
 
-# === Добавляем функции для /add10 и т.д. ===
+# === КОМАНДЫ ДОБАВЛЕНИЯ ОТЖИМАНИЙ ===
 async def add10(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await add_pushups_generic(update, context, 10)
 
@@ -423,6 +428,145 @@ async def add20(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await add_pushups_generic(update, context, 25)
+
+# === НАСТРОЙКИ ===
+
+async def settings_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Изменить время начала дня?",
+        reply_markup=get_yes_no_keyboard()
+    )
+    return SETTINGS_ASK_START
+
+async def settings_ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    answer = update.message.text
+    if answer == "✅ Да":
+        await update.message.reply_text(
+            "Введи новое время начала дня в формате ЧЧ:ММ (например, 07:00):",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return SETTINGS_INPUT_START
+    else:
+        context.user_data["new_start_time"] = None
+        await update.message.reply_text(
+            "Изменить время конца дня?",
+            reply_markup=get_yes_no_keyboard()
+        )
+        return SETTINGS_ASK_END
+
+async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    time_text = update.message.text.strip()
+    if not is_valid_time(time_text):
+        await update.message.reply_text(
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00):"
+        )
+        return SETTINGS_INPUT_START
+    context.user_data["new_start_time"] = time_text
+    await update.message.reply_text(
+        "Изменить время конца дня?",
+        reply_markup=get_yes_no_keyboard()
+    )
+    return SETTINGS_ASK_END
+
+async def settings_ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    answer = update.message.text
+    if answer == "✅ Да":
+        await update.message.reply_text(
+            "Введи новое время конца дня в формате ЧЧ:ММ (например, 22:00):",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return SETTINGS_INPUT_END
+    else:
+        context.user_data["new_end_time"] = None
+        await update.message.reply_text(
+            "Изменить количество напоминаний?",
+            reply_markup=get_yes_no_keyboard()
+        )
+        return SETTINGS_ASK_REMINDERS
+
+async def settings_input_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    time_text = update.message.text.strip()
+    if not is_valid_time(time_text):
+        await update.message.reply_text(
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00):"
+        )
+        return SETTINGS_INPUT_END
+    context.user_data["new_end_time"] = time_text
+    await update.message.reply_text(
+        "Изменить количество напоминаний?",
+        reply_markup=get_yes_no_keyboard()
+    )
+    return SETTINGS_ASK_REMINDERS
+
+async def settings_ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    answer = update.message.text
+    if answer == "✅ Да":
+        await update.message.reply_text(
+            "Введи новое количество напоминаний (от 2 до 10):",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return SETTINGS_INPUT_REMINDERS
+    else:
+        context.user_data["new_reminders"] = None
+        return await settings_apply(update, context)
+
+async def settings_input_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        reminders = int(update.message.text)
+    except ValueError:
+        await update.message.reply_text(
+            "Пожалуйста, введи число (от 2 до 10):"
+        )
+        return SETTINGS_INPUT_REMINDERS
+    if reminders < 2 or reminders > 10:
+        await update.message.reply_text(
+            "Число должно быть от 2 до 10:"
+        )
+        return SETTINGS_INPUT_REMINDERS
+    context.user_data["new_reminders"] = reminders
+    return await settings_apply(update, context)
+
+async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    user_db = get_user(user.id)
+    if not user_db:
+        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
+
+    new_start_time = context.user_data.get("new_start_time")
+    new_end_time = context.user_data.get("new_end_time")
+    new_reminders = context.user_data.get("new_reminders")
+
+    # Если ничего не выбрано для изменения
+    if not any([new_start_time, new_end_time, new_reminders]):
+        await update.message.reply_text(
+            "Изменения не внесены.",
+            reply_markup=get_main_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Выставляем старые значения если не меняли
+    start_time = new_start_time if new_start_time else user_db["start_time"]
+    end_time = new_end_time if new_end_time else user_db["end_time"]
+    reminders = new_reminders if new_reminders else user_db["reminders"]
+
+    # Сохраняем новые значения
+    with open("devils100.db", "rb"):
+        pass  # just to avoid accidental typo; you can remove this line.
+
+    add_user(user.id, user_db["username"], start_time, end_time, reminders)
+
+    # Перезапуск напоминалок
+    start_reminders(context.application, user.id, update.effective_chat.id)
+
+    await update.message.reply_text(
+        "Настройки обновлены! Новое расписание напоминаний:\n"
+        f"Начало дня: {start_time}\n"
+        f"Конец дня: {end_time}\n"
+        f"Число напоминаний: {reminders}",
+        reply_markup=get_main_keyboard()
+    )
+    return ConversationHandler.END
 
 def main():
     application = Application.builder().token(TOKEN).build()
@@ -438,7 +582,24 @@ def main():
         fallbacks=[CommandHandler("start", start), CommandHandler("reset", reset)],
     )
 
+    settings_conv = ConversationHandler(
+        entry_points=[
+            CommandHandler("settings", settings_entry),
+            MessageHandler(filters.Regex(f"^{SETTINGS} Настройки$"), settings_entry)
+        ],
+        states={
+            SETTINGS_ASK_START: [MessageHandler(filters.TEXT & ~filters.COMMAND, settings_ask_start)],
+            SETTINGS_INPUT_START: [MessageHandler(filters.TEXT & ~filters.COMMAND, settings_input_start)],
+            SETTINGS_ASK_END: [MessageHandler(filters.TEXT & ~filters.COMMAND, settings_ask_end)],
+            SETTINGS_INPUT_END: [MessageHandler(filters.TEXT & ~filters.COMMAND, settings_input_end)],
+            SETTINGS_ASK_REMINDERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, settings_ask_reminders)],
+            SETTINGS_INPUT_REMINDERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, settings_input_reminders)],
+        },
+        fallbacks=[],
+    )
+
     application.add_handler(conv_handler)
+    application.add_handler(settings_conv)
     application.add_handler(CommandHandler("reset", reset))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("addday", addday))
@@ -450,7 +611,7 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
 
     logger.info("Bot started!")
-    application.post_init = on_startup  # запускаем on_startup асинхронно
+    application.post_init = on_startup
     application.run_polling()
 
 if __name__ == "__main__":
