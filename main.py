@@ -99,7 +99,7 @@ async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     await update.message.reply_text(
         "Сколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
     )
-    return ConversationHandler.END
+    return ASK_REMINDERS  # Дальше пойдем в save_reminders
 
 async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
