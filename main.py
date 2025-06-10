@@ -97,6 +97,11 @@ def get_back_keyboard():
         [KeyboardButton(BACK)]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+def get_settings_only_keyboard():
+    keyboard = [
+        [KeyboardButton(f"{SETTINGS} Настройки")]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 def progress_bar(val, total, length=5, char_full="🟩", char_empty="⬜️"):
     val = max(0, min(val, total))
