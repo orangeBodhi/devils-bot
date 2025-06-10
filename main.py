@@ -602,24 +602,26 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
         return ConversationHandler.END
 
-    new_start_time = context.user_data.get("new_start_time")
-    new_end_time = context.user_data.get("new_end_time")
-    new_reminders = context.user_data.get("new_reminders")
+    # Исправление: сохранять изменения если хотя бы одно поле не None
+    new_start_time = context.user_data.get("new_start_time", None)
+    new_end_time = context.user_data.get("new_end_time", None)
+    new_reminders = context.user_data.get("new_reminders", None)
 
-    start_time = new_start_time if new_start_time else user_db["start_time"]
-    end_time = new_end_time if new_end_time else user_db["end_time"]
-    reminders = new_reminders if new_reminders else user_db["reminders"]
-
-    if time_to_minutes(end_time) <= time_to_minutes(start_time):
+    # Если ни одно поле не было изменено, не сохранять
+    if all([new_start_time is None, new_end_time is None, new_reminders is None]):
         await update.message.reply_text(
-            "Время конца дня должно быть позже времени начала дня! Изменения не сохранены.",
+            "Изменения не внесены.",
             reply_markup=get_main_keyboard()
         )
         return ConversationHandler.END
 
-    if not any([new_start_time, new_end_time, new_reminders]):
+    start_time = new_start_time if new_start_time is not None else user_db["start_time"]
+    end_time = new_end_time if new_end_time is not None else user_db["end_time"]
+    reminders = new_reminders if new_reminders is not None else user_db["reminders"]
+
+    if time_to_minutes(end_time) <= time_to_minutes(start_time):
         await update.message.reply_text(
-            "Изменения не внесены.",
+            "Время конца дня должно быть позже времени начала дня! Изменения не сохранены.",
             reply_markup=get_main_keyboard()
         )
         return ConversationHandler.END
