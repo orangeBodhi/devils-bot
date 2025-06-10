@@ -338,7 +338,7 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reminders = int(update.message.text)
     except ValueError:
         await update.message.reply_text(
-            "Пожалуйста, введи число (от 2 до 10)\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔(уведомления будут равномерно распределены по рабочему дню) Число должно быть от 2 до 10\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔 (уведомления будут равномерно распределены по рабочему дню) Число должно быть от 2 до 10\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔 (уведомления будут равномерно распределены по рабочему дню)"
+            "Пожалуйста, введи число (от 2 до 10)\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔 (уведомления будут равномерно распределены по рабочему дню)"
         )
         return ASK_REMINDERS
     if reminders < 2 or reminders > 10:
@@ -363,22 +363,22 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     end_time = datetime.strptime(context.user_data["end_time"], "%H:%M").time()
     in_work_time = start_time <= now < end_time
 
-if in_work_time:
-    await update.message.reply_text(
-        f"{DEVIL} Приветствую в Devil's 100 challenge, *{user_name}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
-        reply_markup=get_main_keyboard(),
-        parse_mode="Markdown"
-    )
-    await status(update, context)   # <-- ДОЛЖНА БЫТЬ ВНУТРИ if!
-else:
-    await update.message.reply_text(
-        f"{DEVIL} Поздравляю с регистрацией в Devil's 100 challenge, *{user_name}*! Ожидай начала первого дня согласно настройкам (в момент начала дня, который ты установил при регистрации, и стартует челлендж!) Увидимся! 👋",
-        reply_markup=get_main_keyboard(),
-        parse_mode="Markdown"
-    )
+    if in_work_time:
+        await update.message.reply_text(
+            f"{DEVIL} Приветствую в Devil's 100 challenge, *{user_name}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
+            reply_markup=get_main_keyboard(),
+            parse_mode="Markdown"
+        )
+        await status(update, context)
+    else:
+        await update.message.reply_text(
+            f"{DEVIL} Поздравляю с регистрацией в Devil's 100 challenge, *{user_name}*! Ожидай начала первого дня согласно настройкам (в момент начала дня, который ты установил при регистрации, и стартует челлендж!) Увидимся! 👋",
+            reply_markup=get_main_keyboard(),
+            parse_mode="Markdown"
+        )
 
-start_reminders(context.application, user.id, update.effective_chat.id)
-return ConversationHandler.END
+    start_reminders(context.application, user.id, update.effective_chat.id)
+    return ConversationHandler.END
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
