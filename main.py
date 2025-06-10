@@ -206,9 +206,9 @@ async def add_pushups_generic(update, context, count):
         parse_mode="Markdown"
     )
     # Можно добавить прогресс (не обязательно, но полезно)
-    # await update.message.reply_text(
-    #     f"Текущий прогресс: {emoji_number(new_count)}/100"
-    # )
+    await update.message.reply_text(
+    f"Текущий прогресс: {emoji_number(new_count)}/100"
+    )
     if new_count == 100:
         await update.message.reply_text(
             f"Юху! *{user_name}*, сегодняшняя сотка сделана! Поздравляю! {STRONG} 💯",
