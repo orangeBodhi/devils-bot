@@ -186,6 +186,40 @@ async def send_reminders_loop(application, user_id, chat_id):
                 text="Эй! Ты не забыл про челлендж? Отожмись! 💪",
                 reply_markup=get_main_keyboard()
             )
+        # Ждём наступления времени конца дня
+        end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
+        seconds_to_end = (end_dt - datetime.now(KIEV_TZ)).total_seconds()
+        if seconds_to_end > 0:
+            await asyncio.sleep(seconds_to_end)
+        # После наступления "конца дня" делаем чек
+        u = get_user(user_id)
+        if u:
+            user_name = u["username"] or u["name"] or "друг"
+            if u["pushups_today"] >= 100:
+                next_day(user_id)
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_keyboard()
+                )
+            else:
+                fails = fail_day(user_id)
+                if fails < 3:
+                    await application.bot.send_message(
+                        chat_id=chat_id,
+                        text=f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
+                        parse_mode="Markdown",
+                        reply_markup=get_main_keyboard()
+                    )
+                else:
+                    await application.bot.send_message(
+                        chat_id=chat_id,
+                        text=f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
+                        reply_markup=ReplyKeyboardRemove(),
+                        parse_mode="Markdown"
+                    )
+        # Ждём до полуночи, потом новый цикл
         tomorrow = KIEV_TZ.localize(datetime.combine(now.date() + timedelta(days=1), dt_time(0,0)))
         await asyncio.sleep((tomorrow - datetime.now(KIEV_TZ)).total_seconds())
 
