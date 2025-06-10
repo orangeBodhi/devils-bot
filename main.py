@@ -302,9 +302,9 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bar_days = days_bar(day, 90, 5, "🟪", "⬜️")
     bar_pushups = progress_bar(pushups, 100, 5, "🟩", "⬜️")
     msg = (
-        f"DAY: {emoji_number(day)} {bar_days}\n"
-        f"PROGRESS: {emoji_number(pushups)} {bar_pushups}\n"
-        f"HEALTH: {hearts(fails)}\n"
+        f"DAY: {emoji_number(day)} {bar_days}\n\n"
+        f"PROGRESS: {emoji_number(pushups)} {bar_pushups}\n\n"
+        f"HEALTH: {hearts(fails)}"
     )
     await update.message.reply_text(msg, reply_markup=get_main_keyboard())
 
