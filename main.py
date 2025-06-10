@@ -182,12 +182,16 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reset_user(user.id)
     await update.message.reply_text("Все данные сброшены! Можешь пройти регистрацию заново через /start.")
 
+# ... (весь импорт и остальной код без изменений)
+
 async def add_pushups_generic(update, context, count):
     user = update.effective_user
-    if not get_user(user.id):
+    user_db = get_user(user.id)
+    if not user_db:
         await update.message.reply_text("Сначала зарегистрируйся через /start")
         return
-    cur = get_pushups_today(user.id)
+    user_name = user_db["username"] if user_db.get("username") else "друг"
+    cur = user_db["pushups_today"]
     if cur >= 100:
         await update.message.reply_text(f"Ты уже сделал сегодняшнюю сотку, отдохни! {CHILL}")
         return
@@ -196,9 +200,17 @@ async def add_pushups_generic(update, context, count):
         await update.message.reply_text("Нельзя добавить больше 100 отжиманий за день!")
         return
     new_count = get_pushups_today(user.id)
-    await update.message.reply_text(f"Отлично! {count} отжиманий добавлено к сегодняшнему прогрессу! {TROPHY}\nТекущий прогресс: {new_count}/100")
+    await update.message.reply_text(
+        f"Отлично, *{user_name}*! {count} отжиманий добавлено к сегодняшнему прогрессу! {TROPHY}\n"
+        f"Текущий прогресс: {new_count}/100",
+        parse_mode="Markdown"
+    )
     if new_count == 100:
-        await update.message.reply_text(f"Юху! сегодняшняя сотка сделана! {STRONG} 💯")
+        await update.message.reply_text(
+            f"Юху! *{user_name}*, сегодняшняя сотка сделана! Поздравляю! {STRONG} 💯",
+            parse_mode="Markdown"
+        )
+
 
 async def add10(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await add_pushups_generic(update, context, 10)
