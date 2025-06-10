@@ -197,91 +197,94 @@ async def send_reminders_loop(application, user_id, chat_id):
         if now < start_dt:
             await asyncio.sleep((start_dt - now).total_seconds())
         u = get_user(user_id)
-       if u:
-    day_num = u["day"]
-    if day_num == 1:
-        await application.bot.send_message(
-            chat_id=chat_id,
-            text=f"{DEVIL} Приветствую в Devil's 100 challenge, *{u['username'] or u['name'] or 'друг'}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
-            parse_mode="Markdown",
-            reply_markup=get_main_keyboard()
-        )
-    else:
-        await application.bot.send_message(
-            chat_id=chat_id,
-            text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит ты должен сделать очередные 100 отжиманий! Удачи! {CLOVER}",
-            parse_mode="Markdown",
-            reply_markup=get_main_keyboard()
-        )
-        times = get_reminder_times(start_time, end_time, reminders_count)
-        now = datetime.now(KIEV_TZ)
-        today = now.date()
-        reminder_datetimes = []
-        for t in times:
-            reminder_dt = KIEV_TZ.localize(datetime.combine(today, t))
-            if reminder_dt > now:
-                reminder_datetimes.append(reminder_dt)
-        for reminder_dt in reminder_datetimes:
-            seconds = (reminder_dt - datetime.now(KIEV_TZ)).total_seconds()
-            if seconds > 0:
-                await asyncio.sleep(seconds)
-            pushups = get_pushups_today(user_id)
-            if pushups >= 100:
-                continue
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text="Эй! Ты не забыл про челлендж? Отожмись! 💪",
-                reply_markup=get_main_keyboard()
-            )
-        end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
-        seconds_to_end = (end_dt - datetime.now(KIEV_TZ)).total_seconds()
-        if seconds_to_end > 0:
-            await asyncio.sleep(seconds_to_end)
-        u = get_user(user_id)
         if u:
-            user_name = u["username"] or u["name"] or "друг"
-            if u["pushups_today"] >= 100:
-                day_completed = u["day"]
-                next_day(user_id)
-                if day_completed >= 90:
-                    await application.bot.send_message(
-                        chat_id=chat_id,
-                        text=(
-                            "🎉 Поздравляю с победой в Devil's 100 Challenge! 💪🔥\n"
-                            "Ты доказал(а), что сила — не только в мышцах, но и в характере.\n"
-                            "Каждое утро, каждый подход, каждая капля пота — это шаг к победе над собой.\n"
-                            "Ты — вдохновение для всех, кто стремится к дисциплине и самосовершенствованию! 🌟\n"
-                            "👏 Браво, чемпион! Пусть этот успех станет лишь началом новых достижений! 🚀\n"
-                            "🏆 #90днейсилы #ЖелезнаяВоля👊"
-                        ),
-                        parse_mode="Markdown",
-                        reply_markup=get_main_keyboard()
-                    )
-                else:
-                    await application.bot.send_message(
-                        chat_id=chat_id,
-                        text=f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
-                        parse_mode="Markdown",
-                        reply_markup=get_main_keyboard()
-                    )
+            day_num = u["day"]
+            if day_num == 1:
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"{DEVIL} Приветствую в Devil's 100 challenge, *{u['username'] or u['name'] or 'друг'}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_keyboard()
+                )
             else:
-                fails = fail_day(user_id)
-                if fails < 3:
-                    await application.bot.send_message(
-                        chat_id=chat_id,
-                        text=f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
-                        parse_mode="Markdown",
-                        reply_markup=get_main_keyboard()
-                    )
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит ты должен сделать очередные 100 отжиманий! Удачи! {CLOVER}",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_keyboard()
+                )
+
+            # --- ВСЕГДА после приветствия: рассылка напоминаний ---
+            times = get_reminder_times(start_time, end_time, reminders_count)
+            now = datetime.now(KIEV_TZ)
+            today = now.date()
+            reminder_datetimes = []
+            for t in times:
+                reminder_dt = KIEV_TZ.localize(datetime.combine(today, t))
+                if reminder_dt > now:
+                    reminder_datetimes.append(reminder_dt)
+            for reminder_dt in reminder_datetimes:
+                seconds = (reminder_dt - datetime.now(KIEV_TZ)).total_seconds()
+                if seconds > 0:
+                    await asyncio.sleep(seconds)
+                pushups = get_pushups_today(user_id)
+                if pushups >= 100:
+                    continue
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text="Эй! Ты не забыл про челлендж? Отожмись! 💪",
+                    reply_markup=get_main_keyboard()
+                )
+            # --- Дожидаемся конца дня ---
+            end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
+            seconds_to_end = (end_dt - datetime.now(KIEV_TZ)).total_seconds()
+            if seconds_to_end > 0:
+                await asyncio.sleep(seconds_to_end)
+            u = get_user(user_id)
+            if u:
+                user_name = u["username"] or u["name"] or "друг"
+                if u["pushups_today"] >= 100:
+                    day_completed = u["day"]
+                    next_day(user_id)
+                    if day_completed >= 90:
+                        await application.bot.send_message(
+                            chat_id=chat_id,
+                            text=(
+                                "🎉 Поздравляю с победой в Devil's 100 Challenge! 💪🔥\n"
+                                "Ты доказал(а), что сила — не только в мышцах, но и в характере.\n"
+                                "Каждое утро, каждый подход, каждая капля пота — это шаг к победе над собой.\n"
+                                "Ты — вдохновение для всех, кто стремится к дисциплине и самосовершенствованию! 🌟\n"
+                                "👏 Браво, чемпион! Пусть этот успех станет лишь началом новых достижений! 🚀\n"
+                                "🏆 #90днейсилы #ЖелезнаяВоля👊"
+                            ),
+                            parse_mode="Markdown",
+                            reply_markup=get_main_keyboard()
+                        )
+                    else:
+                        await application.bot.send_message(
+                            chat_id=chat_id,
+                            text=f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
+                            parse_mode="Markdown",
+                            reply_markup=get_main_keyboard()
+                        )
                 else:
-                    await application.bot.send_message(
-                        chat_id=chat_id,
-                        text=f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
-                        reply_markup=ReplyKeyboardRemove(),
-                        parse_mode="Markdown"
-                    )
-        tomorrow = KIEV_TZ.localize(datetime.combine(now.date() + timedelta(days=1), dt_time(0,0)))
-        await asyncio.sleep((tomorrow - datetime.now(KIEV_TZ)).total_seconds())
+                    fails = fail_day(user_id)
+                    if fails < 3:
+                        await application.bot.send_message(
+                            chat_id=chat_id,
+                            text=f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
+                            parse_mode="Markdown",
+                            reply_markup=get_main_keyboard()
+                        )
+                    else:
+                        await application.bot.send_message(
+                            chat_id=chat_id,
+                            text=f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
+                            reply_markup=ReplyKeyboardRemove(),
+                            parse_mode="Markdown"
+                        )
+            tomorrow = KIEV_TZ.localize(datetime.combine(now.date() + timedelta(days=1), dt_time(0,0)))
+            await asyncio.sleep((tomorrow - datetime.now(KIEV_TZ)).total_seconds())
 
 def start_reminders(application, user_id, chat_id):
     old_task = reminder_tasks.get(user_id)
