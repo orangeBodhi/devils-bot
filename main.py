@@ -170,7 +170,7 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
     await update.message.reply_text(
-        f"{DEVIL} Приветствую в Devil's 100 challenge! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
+        f"{DEVIL} Приветствую в Devil's 100 challenge, *{user_name}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
         reply_markup=reply_markup
     )
     # Сразу же выводим /status с той же клавиатурой
@@ -181,8 +181,6 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     reset_user(user.id)
     await update.message.reply_text("Все данные сброшены! Можешь пройти регистрацию заново через /start.")
-
-# ... (весь импорт и остальной код без изменений)
 
 async def add_pushups_generic(update, context, count):
     user = update.effective_user
@@ -225,7 +223,7 @@ async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await add_pushups_generic(update, context, 25)
 
 async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Введите количество сделанных отжиманий (например, 13):")
+    await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):")
     context.user_data["awaiting_custom"] = True
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -233,7 +231,7 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             count = int(update.message.text)
         except ValueError:
-            await update.message.reply_text("Пожалуйста, введите число.")
+            await update.message.reply_text("Пожалуйста, введи число.")
             return
         await add_pushups_generic(update, context, count)
         context.user_data["awaiting_custom"] = False
@@ -268,11 +266,11 @@ async def check_end_of_day(user_id, update):
         fails = fail_day(user_id)
         if fails < 3:
             await update.message.reply_text(
-                f"Па-па-па… Сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}"
+                f"Па-па-па… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}"
             )
         else:
             await update.message.reply_text(
-                f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
+                f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
                 reply_markup=ReplyKeyboardRemove()
             )
 
@@ -287,7 +285,7 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         next_day(user.id)
         await update.message.reply_text(
-            f"Поздравляю, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}"
+            f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}"
         )
     await status(update, context)
 
