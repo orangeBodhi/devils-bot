@@ -29,6 +29,7 @@ from db import (
     fail_day,
     get_fails,
     get_day,
+    get_all_user_ids,  # не забудь обязательно про этот импорт!
 )
 
 ASK_NAME, ASK_START_TIME, ASK_END_TIME, ASK_REMINDERS = range(4)
@@ -404,12 +405,24 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def on_startup(application: Application):
     """Запустить напоминалки для всех пользователей при запуске бота."""
-    from telegram.constants import ChatType
-    for user_id in get_all_user_ids():  # реализуй get_all_user_ids в db.py
+    for user_id in get_all_user_ids():
         user = get_user(user_id)
         if user:
             chat_id = user_id  # предполагаем, что юзер всегда в личке с ботом
             start_reminders(application, user_id, chat_id)
+
+# === Добавляем функции для /add10 и т.д. ===
+async def add10(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 10)
+
+async def add15(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 15)
+
+async def add20(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 20)
+
+async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await add_pushups_generic(update, context, 25)
 
 def main():
     application = Application.builder().token(TOKEN).build()
