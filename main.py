@@ -72,12 +72,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_db = get_user(user.id)
     if user_db:
         await update.message.reply_text(
-            f"Ты уже зарегистрирован! Напиши /reset, чтобы начать заново.", reply_markup=ReplyKeyboardRemove()
+            "Ты уже зарегистрирован! Напиши /reset, чтобы начать заново.", reply_markup=ReplyKeyboardRemove()
         )
         return ConversationHandler.END
-    await update.message.reply_text(
-        "Как к тебе обращаться? 📝"
-    )
+    await update.message.reply_text("Как к тебе обращаться? 📝")
     return ASK_NAME
 
 async def ask_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -85,14 +83,14 @@ async def ask_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text(
         "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 07:00), когда бот начинает работать (начало дня) и ты сможешь записывать свои отжимания🕒"
     )
-    return ASK_END_TIME
+    return ASK_START_TIME
 
 async def ask_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["start_time"] = update.message.text
     await update.message.reply_text(
         "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 22:00), когда бот завершает работу (конец дня) 🕒 и ты больше не сможешь добавлять отжимания в этот день"
     )
-    return ASK_REMINDERS
+    return ASK_END_TIME
 
 async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["end_time"] = update.message.text
@@ -105,10 +103,14 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         reminders = int(update.message.text)
     except ValueError:
-        await update.message.reply_text("Пожалуйста, введи число (от 2 до 10)")
+        await update.message.reply_text(
+            "Пожалуйста, введи число (от 2 до 10)\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
+        )
         return ASK_REMINDERS
     if reminders < 2 or reminders > 10:
-        await update.message.reply_text("Число должно быть от 2 до 10")
+        await update.message.reply_text(
+            "Число должно быть от 2 до 10\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
+        )
         return ASK_REMINDERS
     context.user_data["reminders"] = reminders
     user = update.effective_user
@@ -127,7 +129,6 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    # Всегда делаем сброс, даже если пользователь не найден
     reset_user(user.id)
     await update.message.reply_text("Все данные сброшены! Можешь пройти регистрацию заново через /start.")
 
