@@ -1,5 +1,7 @@
 import logging
 import os
+import re
+from datetime import datetime
 from dotenv import load_dotenv
 from telegram import (
     Update,
@@ -67,6 +69,20 @@ def emoji_number(num):
 def hearts(fails):
     return (HEART_RED * (3 - fails)) + (HEART_BLACK * fails)
 
+def is_valid_time(timestr):
+    """Проверка формата ЧЧ:ММ и валидности времени"""
+    if not re.match(r"^\d{2}:\d{2}$", timestr):
+        return False
+    try:
+        datetime.strptime(timestr, "%H:%M")
+        return True
+    except ValueError:
+        return False
+
+def time_to_minutes(timestr):
+    h, m = map(int, timestr.split(":"))
+    return h * 60 + m
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     user_db = get_user(user.id)
@@ -86,14 +102,37 @@ async def ask_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     return ASK_START_TIME
 
 async def ask_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["start_time"] = update.message.text
+    time_text = update.message.text.strip()
+    if not is_valid_time(time_text):
+        await update.message.reply_text(
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00)"
+        )
+        return ASK_START_TIME
+    context.user_data["start_time"] = time_text
     await update.message.reply_text(
         "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 22:00), когда бот завершает работу (конец дня) 🕒 и ты больше не сможешь добавлять отжимания в этот день"
     )
     return ASK_END_TIME
 
 async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["end_time"] = update.message.text
+    time_text = update.message.text.strip()
+    if not is_valid_time(time_text):
+        await update.message.reply_text(
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00)"
+        )
+        return ASK_END_TIME
+
+    start_time = context.user_data.get("start_time")
+    end_time = time_text
+
+    if time_to_minutes(end_time) <= time_to_minutes(start_time):
+        await update.message.reply_text(
+            "Время конца дня должно быть позже времени начала дня!\n"
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00), когда бот завершает работу (конец дня)"
+        )
+        return ASK_END_TIME
+
+    context.user_data["end_time"] = end_time
     await update.message.reply_text(
         "Сколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
     )
