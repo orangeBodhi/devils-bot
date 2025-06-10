@@ -56,6 +56,14 @@ logger = logging.getLogger(__name__)
 
 init_db()
 
+def get_main_keyboard():
+    keyboard = [
+        [KeyboardButton("/add10"), KeyboardButton("/add15")],
+        [KeyboardButton("/add20"), KeyboardButton("/add25")],
+        [KeyboardButton("/add"), KeyboardButton("/status")]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
 def progress_bar(val, total, length, char="▇", empty="—"):
     filled = int(round(length * val / float(total)))
     return char * filled + empty * (length - filled)
@@ -89,16 +97,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_db = get_user(user.id)
     if user_db:
         await update.message.reply_text(
-            "Ты уже зарегистрирован! Напиши /reset, чтобы начать заново.", reply_markup=ReplyKeyboardRemove()
+            "Ты уже зарегистрирован! Напиши /reset, чтобы начать заново.", reply_markup=get_main_keyboard()
         )
         return ConversationHandler.END
-    await update.message.reply_text("Как к тебе обращаться? 📝")
+    await update.message.reply_text("Как к тебе обращаться? 📝", reply_markup=get_main_keyboard())
     return ASK_NAME
 
 async def ask_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["name"] = update.message.text
     await update.message.reply_text(
-        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 07:00), когда бот начинает работать (начало дня) и ты сможешь записывать свои отжимания🕒"
+        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 07:00), когда бот начинает работать (начало дня) и ты сможешь записывать свои отжимания🕒",
+        reply_markup=get_main_keyboard()
     )
     return ASK_START_TIME
 
@@ -106,12 +115,14 @@ async def ask_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     time_text = update.message.text.strip()
     if not is_valid_time(time_text):
         await update.message.reply_text(
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00)"
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00)",
+            reply_markup=get_main_keyboard()
         )
         return ASK_START_TIME
     context.user_data["start_time"] = time_text
     await update.message.reply_text(
-        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 22:00), когда бот завершает работу (конец дня) 🕒 и ты больше не сможешь добавлять отжимания в этот день"
+        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 22:00), когда бот завершает работу (конец дня) 🕒 и ты больше не сможешь добавлять отжимания в этот день",
+        reply_markup=get_main_keyboard()
     )
     return ASK_END_TIME
 
@@ -119,7 +130,8 @@ async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     time_text = update.message.text.strip()
     if not is_valid_time(time_text):
         await update.message.reply_text(
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00)"
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00)",
+            reply_markup=get_main_keyboard()
         )
         return ASK_END_TIME
 
@@ -129,13 +141,15 @@ async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if time_to_minutes(end_time) <= time_to_minutes(start_time):
         await update.message.reply_text(
             "Время конца дня должно быть позже времени начала дня!\n"
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00), когда бот завершает работу (конец дня)"
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00), когда бот завершает работу (конец дня)",
+            reply_markup=get_main_keyboard()
         )
         return ASK_END_TIME
 
     context.user_data["end_time"] = end_time
     await update.message.reply_text(
-        "Сколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
+        "Сколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔",
+        reply_markup=get_main_keyboard()
     )
     return ASK_REMINDERS
 
@@ -144,12 +158,14 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reminders = int(update.message.text)
     except ValueError:
         await update.message.reply_text(
-            "Пожалуйста, введи число (от 2 до 10)\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
+            "Пожалуйста, введи число (от 2 до 10)\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔",
+            reply_markup=get_main_keyboard()
         )
         return ASK_REMINDERS
     if reminders < 2 or reminders > 10:
         await update.message.reply_text(
-            "Число должно быть от 2 до 10\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
+            "Число должно быть от 2 до 10\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔",
+            reply_markup=get_main_keyboard()
         )
         return ASK_REMINDERS
     context.user_data["reminders"] = reminders
@@ -164,16 +180,9 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data["reminders"]
     )
 
-    keyboard = [
-        [KeyboardButton("/add10"), KeyboardButton("/add15")],
-        [KeyboardButton("/add20"), KeyboardButton("/add25")],
-        [KeyboardButton("/add"), KeyboardButton("/status")]
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
     await update.message.reply_text(
         f"{DEVIL} Приветствую в Devil's 100 challenge, *{user_name}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
-        reply_markup=reply_markup,
+        reply_markup=get_main_keyboard(),
         parse_mode="Markdown"
     )
     await status(update, context)
@@ -182,37 +191,38 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     reset_user(user.id)
-    await update.message.reply_text("Все данные сброшены! Можешь пройти регистрацию заново через /start.")
+    await update.message.reply_text("Все данные сброшены! Можешь пройти регистрацию заново через /start.", reply_markup=ReplyKeyboardRemove())
 
 async def add_pushups_generic(update, context, count):
     user = update.effective_user
     user_db = get_user(user.id)
     if not user_db:
-        await update.message.reply_text("Сначала зарегистрируйся через /start")
+        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
         return
     user_name = user_db["username"] or user_db["name"] or "друг"
     cur = user_db["pushups_today"]
     if cur >= 100:
-        await update.message.reply_text(f"Ты уже сделал сегодняшнюю сотку, отдохни! {CHILL}")
+        await update.message.reply_text(f"Ты уже сделал сегодняшнюю сотку, отдохни! {CHILL}", reply_markup=get_main_keyboard())
         return
     ok = add_pushups(user.id, count)
     if not ok:
-        await update.message.reply_text("Нельзя добавить больше 100 отжиманий за день!")
+        await update.message.reply_text("Нельзя добавить больше 100 отжиманий за день!", reply_markup=get_main_keyboard())
         return
     new_count = get_pushups_today(user.id)
-    # Главное сообщение ТЗ: "Отлично! ХХ (емодзи-числами) отжиманий добавлено к сегодняшнему прогрессу (📈)"
     await update.message.reply_text(
         f"Отлично! {emoji_number(count)} отжиманий добавлено к сегодняшнему прогрессу {UP}",
-        parse_mode="Markdown"
+        parse_mode="Markdown",
+        reply_markup=get_main_keyboard()
     )
-    # Можно добавить прогресс (не обязательно, но полезно)
     await update.message.reply_text(
-        f"Текущий прогресс: {emoji_number(new_count)}/100"
+        f"Текущий прогресс: {emoji_number(new_count)}/100",
+        reply_markup=get_main_keyboard()
     )
     if new_count == 100:
         await update.message.reply_text(
             f"Юху! *{user_name}*, сегодняшняя сотка сделана! Поздравляю! {STRONG} 💯",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard()
         )
 
 async def add10(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -229,14 +239,14 @@ async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_custom"] = True
-    await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):")
+    await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):", reply_markup=get_main_keyboard())
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("awaiting_custom"):
         try:
             count = int(update.message.text)
         except ValueError:
-            await update.message.reply_text("Пожалуйста, введи число.")
+            await update.message.reply_text("Пожалуйста, введи число.", reply_markup=get_main_keyboard())
             return
         await add_pushups_generic(update, context, count)
         context.user_data["awaiting_custom"] = False
@@ -245,7 +255,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     u = get_user(user.id)
     if not u:
-        await update.message.reply_text("Сначала зарегистрируйся через /start")
+        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
         return
     day = u["day"]
     fails = u["fails"]
@@ -257,13 +267,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"PROGRESS: {emoji_number(pushups)}/100 {bar_pushups}\n"
         f"HEALTH: {hearts(fails)}\n"
     )
-    keyboard = [
-        [KeyboardButton("/add10"), KeyboardButton("/add15")],
-        [KeyboardButton("/add20"), KeyboardButton("/add25")],
-        [KeyboardButton("/add"), KeyboardButton("/status")]
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(msg, reply_markup=reply_markup)
+    await update.message.reply_text(msg, reply_markup=get_main_keyboard())
 
 async def check_end_of_day(user_id, update):
     u = get_user(user_id)
@@ -273,7 +277,8 @@ async def check_end_of_day(user_id, update):
         if fails < 3:
             await update.message.reply_text(
                 f"Па-па-па… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
             )
         else:
             await update.message.reply_text(
@@ -287,7 +292,7 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u = get_user(user.id)
     user_name = u["username"] or u["name"] or "друг"
     if not u:
-        await update.message.reply_text("Сначала зарегистрируйся через /start")
+        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
         return
     if u["pushups_today"] < 100:
         await check_end_of_day(user.id, update)
@@ -295,7 +300,8 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
         next_day(user.id)
         await update.message.reply_text(
             f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard()
         )
     await status(update, context)
 
