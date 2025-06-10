@@ -229,7 +229,7 @@ async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_custom"] = True
     await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):")
 
-aasync def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("awaiting_custom"):
         try:
             count = int(update.message.text)
