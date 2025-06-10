@@ -153,8 +153,6 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return ASK_REMINDERS
     context.user_data["reminders"] = reminders
     user = update.effective_user
-
-    # Получаем имя пользователя для приветствия
     user_name = context.user_data.get("name", "друг")
 
     add_user(
@@ -179,7 +177,7 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
     # Сразу же выводим /status с той же клавиатурой
     await status(update, context)
-    return ConversationHandler.END
+    return ConversationHandler.END #
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -230,6 +228,9 @@ async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):")
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("handle_custom_pushups called")
+    if context.user_data.get("awaiting_custom"):
+        print("awaiting_custom is True")
     if context.user_data.get("awaiting_custom"):
         try:
             count = int(update.message.text)
@@ -238,7 +239,7 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
             return
         await add_pushups_generic(update, context, count)
         context.user_data["awaiting_custom"] = False
-        
+
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     u = get_user(user.id)
@@ -320,6 +321,7 @@ def main():
     application.add_handler(CommandHandler("add20", add20))
     application.add_handler(CommandHandler("add25", add25))
     application.add_handler(CommandHandler("add", add_custom))
+    # ВАЖНО: этот обработчик должен быть последним для TEXT
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
 
     logger.info("Bot started!")
