@@ -1,7 +1,8 @@
 import logging
 import os
 import re
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta, time as dt_time
 from dotenv import load_dotenv
 from telegram import (
     Update,
@@ -54,6 +55,9 @@ logger = logging.getLogger(__name__)
 
 init_db()
 
+# Для хранения задач напоминаний по user_id
+reminder_tasks = {}
+
 def get_main_keyboard():
     keyboard = [
         [KeyboardButton("🎯 +10 отжиманий"), KeyboardButton("🎯 +15 отжиманий")],
@@ -63,7 +67,6 @@ def get_main_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 def progress_bar(val, total, length=5, char_full="🟩", char_empty="⬜️"):
-    """Графический прогресс-бар с цветными эмодзи и %."""
     val = max(0, min(val, total))
     filled = int(round(length * val / float(total)))
     empty = length - filled
@@ -72,7 +75,6 @@ def progress_bar(val, total, length=5, char_full="🟩", char_empty="⬜️"):
     return f"{bar} {percent}%"
 
 def days_bar(day, total_days=90, length=5, char_full="🟪", char_empty="⬜️"):
-    """Прогресс-бар для дней (фиолетовый 🟪/белый ⬜️) и %."""
     day = max(0, min(day, total_days))
     filled = int(round(length * day / float(total_days)))
     empty = length - filled
@@ -102,6 +104,74 @@ def is_valid_time(timestr):
 def time_to_minutes(timestr):
     h, m = map(int, timestr.split(":"))
     return h * 60 + m
+
+def minutes_to_time(mins):
+    h = mins // 60
+    m = mins % 60
+    return dt_time(hour=h, minute=m)
+
+def get_reminder_times(start_time_str, end_time_str, reminders_count):
+    """Вернёт список времени напоминаний в формате [datetime.time, ...] равномерно между стартом и концом."""
+    start_dt = datetime.strptime(start_time_str, "%H:%M")
+    end_dt = datetime.strptime(end_time_str, "%H:%M")
+    total_minutes = int((end_dt - start_dt).total_seconds() // 60)
+    if reminders_count < 2:
+        return [start_dt.time()]
+    interval = total_minutes / (reminders_count - 1)
+    times = []
+    for i in range(reminders_count):
+        mins = int(round(i * interval))
+        t = (start_dt + timedelta(minutes=mins)).time()
+        times.append(t)
+    return times
+
+async def send_reminders_loop(application, user_id, chat_id):
+    """Фоновая задача на каждый день: отправлять напоминания по расписанию, если челлендж не завершён."""
+    while True:
+        u = get_user(user_id)
+        if not u:
+            return
+        # Получаем расписание
+        start_time = u["start_time"]
+        end_time = u["end_time"]
+        reminders_count = u["reminders"]
+        times = get_reminder_times(start_time, end_time, reminders_count)
+
+        now = datetime.now()
+        today = now.date()
+        # Считаем datetime для всех напоминаний на сегодня
+        reminder_datetimes = []
+        for t in times:
+            reminder_dt = datetime.combine(today, t)
+            if reminder_dt > now:
+                reminder_datetimes.append(reminder_dt)
+        # Запускаем отправку напоминаний на сегодня
+        for reminder_dt in reminder_datetimes:
+            seconds = (reminder_dt - datetime.now()).total_seconds()
+            if seconds > 0:
+                await asyncio.sleep(seconds)
+            # Проверяем, нужно ли отправлять (100 сделано - не отправляем)
+            pushups = get_pushups_today(user_id)
+            if pushups >= 100:
+                continue
+            # Отправляем напоминание
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text="Эй! Ты не забыл про челлендж? Отожмись! 💪",
+                reply_markup=get_main_keyboard()
+            )
+        # Спим до полуночи
+        tomorrow = datetime.combine(now.date() + timedelta(days=1), dt_time(0,0))
+        await asyncio.sleep((tomorrow - datetime.now()).total_seconds())
+
+def start_reminders(application, user_id, chat_id):
+    """Запустить фоновую задачу напоминаний для пользователя."""
+    # Если уже есть задача для этого пользователя — отменяем
+    old_task = reminder_tasks.get(user_id)
+    if old_task:
+        old_task.cancel()
+    task = asyncio.create_task(send_reminders_loop(application, user_id, chat_id))
+    reminder_tasks[user_id] = task
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
@@ -189,19 +259,25 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reply_markup=get_main_keyboard(),
         parse_mode="Markdown"
     )
+    # Запустить напоминалки!
+    start_reminders(context.application, user.id, update.effective_chat.id)
     await status(update, context)
     return ConversationHandler.END
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     reset_user(user.id)
+    # Остановить напоминалки
+    old_task = reminder_tasks.get(user.id)
+    if old_task:
+        old_task.cancel()
+        reminder_tasks.pop(user.id)
     await update.message.reply_text(
         "Все данные сброшены! Можешь пройти регистрацию заново через /start.",
         reply_markup=ReplyKeyboardRemove()
     )
 
 def parse_pushup_command(text):
-    """Возвращает число если текст — одна из кнопок типа '🎯 +10 отжиманий', иначе None."""
     mapping = {
         "🎯 +10 отжиманий": 10,
         "🎯 +15 отжиманий": 15,
@@ -220,7 +296,6 @@ async def add_pushups_generic(update, context, count):
     user_name = user_db["username"] or user_db["name"] or "друг"
     cur = user_db["pushups_today"]
 
-    # Если уже >= 100 — больше не даём добавить ни одной попытки
     if cur >= 100:
         await update.message.reply_text(
             "Нельзя добавить больше 100 отжиманий за день!",
@@ -228,7 +303,6 @@ async def add_pushups_generic(update, context, count):
         )
         return
 
-    # Этот вызов должен позволять превысить 100 (например, было 79, добавил 44 — стало 123)
     ok = add_pushups(user.id, count)
     new_count = get_pushups_today(user.id)
 
@@ -248,38 +322,22 @@ async def add_pushups_generic(update, context, count):
             reply_markup=get_main_keyboard()
         )
 
-async def add10(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await add_pushups_generic(update, context, 10)
-
-async def add15(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await add_pushups_generic(update, context, 15)
-
-async def add20(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await add_pushups_generic(update, context, 20)
-
-async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await add_pushups_generic(update, context, 25)
-
 async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_custom"] = True
     await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):", reply_markup=get_main_keyboard())
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    # Если пользователь нажал на одну из кнопок с количеством — обрабатываем их напрямую
     count = parse_pushup_command(text)
     if count is not None:
         await add_pushups_generic(update, context, count)
         return
-    # Если пользователь выбрал кнопку "🎲 Другое число" — включаем режим кастомного ввода
     if text == "🎲 Другое число":
         await add_custom(update, context)
         return
-    # Если пользователь выбрал "🏅 Мой статус" — показываем статус
     if text == "🏅 Мой статус":
         await status(update, context)
         return
-    # Если ждем кастомное число
     if context.user_data.get("awaiting_custom"):
         try:
             count = int(text)
@@ -344,6 +402,15 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     await status(update, context)
 
+async def on_startup(application: Application):
+    """Запустить напоминалки для всех пользователей при запуске бота."""
+    from telegram.constants import ChatType
+    for user_id in get_all_user_ids():  # реализуй get_all_user_ids в db.py
+        user = get_user(user_id)
+        if user:
+            chat_id = user_id  # предполагаем, что юзер всегда в личке с ботом
+            start_reminders(application, user_id, chat_id)
+
 def main():
     application = Application.builder().token(TOKEN).build()
 
@@ -367,10 +434,10 @@ def main():
     application.add_handler(CommandHandler("add20", add20))
     application.add_handler(CommandHandler("add25", add25))
     application.add_handler(CommandHandler("add", add_custom))
-    # ВАЖНО: этот обработчик должен быть последним для TEXT
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
 
     logger.info("Bot started!")
+    application.run_async(on_startup(application))
     application.run_polling()
 
 if __name__ == "__main__":
