@@ -480,7 +480,7 @@ async def settings_ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return SETTINGS_INPUT_START
     else:
-        context.user_data["new_start_time"] = None
+        # Не трогаем context.user_data["new_start_time"]
         await update.message.reply_text(
             f"Изменить время конца дня? (текущее время: {end_time})",
             reply_markup=get_yes_no_back_keyboard()
@@ -527,7 +527,7 @@ async def settings_ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return SETTINGS_INPUT_END
     else:
-        context.user_data["new_end_time"] = None
+        # Не трогаем context.user_data["new_end_time"]
         await update.message.reply_text(
             f"Изменить количество напоминаний? (текущее количество: {reminders})",
             reply_markup=get_yes_no_back_keyboard()
@@ -571,7 +571,7 @@ async def settings_ask_reminders(update: Update, context: ContextTypes.DEFAULT_T
         )
         return SETTINGS_INPUT_REMINDERS
     else:
-        context.user_data["new_reminders"] = None
+        # Не трогаем context.user_data["new_reminders"]
         return await settings_apply(update, context)
 
 async def settings_input_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -602,22 +602,18 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
         return ConversationHandler.END
 
-    # Исправление: сохранять изменения если хотя бы одно поле не None
-    new_start_time = context.user_data.get("new_start_time", None)
-    new_end_time = context.user_data.get("new_end_time", None)
-    new_reminders = context.user_data.get("new_reminders", None)
-
-    # Если ни одно поле не было изменено, не сохранять
-    if all([new_start_time is None, new_end_time is None, new_reminders is None]):
+    # Главное изменение: проверяем наличие КЛЮЧА, а не значения!
+    keys = context.user_data.keys()
+    if not any(k in keys for k in ["new_start_time", "new_end_time", "new_reminders"]):
         await update.message.reply_text(
             "Изменения не внесены.",
             reply_markup=get_main_keyboard()
         )
         return ConversationHandler.END
 
-    start_time = new_start_time if new_start_time is not None else user_db["start_time"]
-    end_time = new_end_time if new_end_time is not None else user_db["end_time"]
-    reminders = new_reminders if new_reminders is not None else user_db["reminders"]
+    start_time = context.user_data["new_start_time"] if "new_start_time" in context.user_data else user_db["start_time"]
+    end_time = context.user_data["new_end_time"] if "new_end_time" in context.user_data else user_db["end_time"]
+    reminders = context.user_data["new_reminders"] if "new_reminders" in context.user_data else user_db["reminders"]
 
     if time_to_minutes(end_time) <= time_to_minutes(start_time):
         await update.message.reply_text(
@@ -627,7 +623,6 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     update_user_settings(user.id, start_time, end_time, reminders)
-
     start_reminders(context.application, user.id, update.effective_chat.id)
 
     await update.message.reply_text(
