@@ -394,7 +394,7 @@ async def check_end_of_day(user_id, update):
         fails = fail_day(user_id)
         if fails < 3:
             await update.message.reply_text(
-                f"Па-па-па… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
+                f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
                 parse_mode="Markdown",
                 reply_markup=get_main_keyboard()
             )
