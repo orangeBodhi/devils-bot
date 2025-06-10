@@ -53,7 +53,7 @@ def reset_user(user_id):
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("DELETE FROM progress WHERE user_id = ?", (user_id,))
-        c.execute("UPDATE users SET day=1, pushups_today=0, fails=0 WHERE user_id=?", (user_id,))
+        c.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
         conn.commit()
 
 def add_pushups(user_id, count):
