@@ -157,7 +157,20 @@ def get_reminder_times(start_time_str, end_time_str, reminders_count):
         times.append(t)
     return times
 
+def is_within_today_working_period(start_time, end_time):
+    now = datetime.now(KIEV_TZ)
+    today = now.date()
+    start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
+    end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
+    return start_dt <= now < end_dt
+
 async def send_reminders_loop(application, user_id, chat_id):
+    u = get_user(user_id)
+    if not u:
+        return
+    skip_today = False
+    if u["day"] == 1 and not is_within_today_working_period(u["start_time"], u["end_time"]):
+        skip_today = True
     while True:
         u = get_user(user_id)
         if not u:
@@ -168,19 +181,20 @@ async def send_reminders_loop(application, user_id, chat_id):
         now = datetime.now(KIEV_TZ)
         today = now.date()
         start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
-        # 1. Ждём наступления начала дня
         if now < start_dt:
             await asyncio.sleep((start_dt - now).total_seconds())
-        # 2. Приветствие (не для первого дня)
-        u = get_user(user_id)
-        if u and u["day"] > 1:
-            day_num = u["day"]
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит ты должен сделать очередные 100 отжиманий! Удачи! {CLOVER}",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard()
-            )
+        if skip_today:
+            skip_today = False
+        else:
+            u = get_user(user_id)
+            if u and u["day"] > 1:
+                day_num = u["day"]
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит ты должен сделать очередные 100 отжиманий! Удачи! {CLOVER}",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_keyboard()
+                )
         times = get_reminder_times(start_time, end_time, reminders_count)
         now = datetime.now(KIEV_TZ)
         today = now.date()
@@ -201,14 +215,14 @@ async def send_reminders_loop(application, user_id, chat_id):
                 text="Эй! Ты не забыл про челлендж? Отожмись! 💪",
                 reply_markup=get_main_keyboard()
             )
-        # Ждём наступления времени конца дня
         end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
         seconds_to_end = (end_dt - datetime.now(KIEV_TZ)).total_seconds()
         if seconds_to_end > 0:
             await asyncio.sleep(seconds_to_end)
-        # После наступления "конца дня" делаем чек
         u = get_user(user_id)
-        if u:
+        if skip_today:
+            skip_today = False
+        elif u:
             user_name = u["username"] or u["name"] or "друг"
             if u["pushups_today"] >= 100:
                 next_day(user_id)
@@ -234,7 +248,6 @@ async def send_reminders_loop(application, user_id, chat_id):
                         reply_markup=ReplyKeyboardRemove(),
                         parse_mode="Markdown"
                     )
-        # Ждём до полуночи, потом новый цикл
         tomorrow = KIEV_TZ.localize(datetime.combine(now.date() + timedelta(days=1), dt_time(0,0)))
         await asyncio.sleep((tomorrow - datetime.now(KIEV_TZ)).total_seconds())
 
@@ -485,7 +498,6 @@ async def on_startup(application: Application):
             chat_id = user_id
             start_reminders(application, user_id, chat_id)
 
-# === КОМАНДЫ ДОБАВЛЕНИЯ ОТЖИМАНИЙ ===
 async def add10(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await add_pushups_generic(update, context, 10)
 
@@ -497,8 +509,6 @@ async def add20(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await add_pushups_generic(update, context, 25)
-
-# === НАСТРОЙКИ ===
 
 async def cancel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -682,7 +692,6 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
-# === Скрытая команда для теста напоминаний через /settestreminders ===
 async def settestreminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
