@@ -62,7 +62,6 @@ SETTINGS = "⚙️"
 BACK = "⬅️ Назад"
 CANCEL_EMOJI = "🛑"
 
-# ADMIN ID for hidden test commands
 ADMIN_ID = 271278573
 
 load_dotenv()
@@ -168,9 +167,9 @@ async def send_reminders_loop(application, user_id, chat_id):
     u = get_user(user_id)
     if not u:
         return
-    skip_today = False
+    skip_day = False
     if u["day"] == 1 and not is_within_today_working_period(u["start_time"], u["end_time"]):
-        skip_today = True
+        skip_day = True
     while True:
         u = get_user(user_id)
         if not u:
@@ -181,20 +180,26 @@ async def send_reminders_loop(application, user_id, chat_id):
         now = datetime.now(KIEV_TZ)
         today = now.date()
         start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
+        end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
+        if skip_day:
+            if now >= end_dt:
+                next_start_dt = KIEV_TZ.localize(datetime.combine(today + timedelta(days=1), datetime.strptime(start_time, "%H:%M").time()))
+                await asyncio.sleep((next_start_dt - now).total_seconds())
+            elif now < start_dt:
+                await asyncio.sleep((start_dt - now).total_seconds())
+            skip_day = False
+            continue
         if now < start_dt:
             await asyncio.sleep((start_dt - now).total_seconds())
-        if skip_today:
-            skip_today = False
-        else:
-            u = get_user(user_id)
-            if u and u["day"] > 1:
-                day_num = u["day"]
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит ты должен сделать очередные 100 отжиманий! Удачи! {CLOVER}",
-                    parse_mode="Markdown",
-                    reply_markup=get_main_keyboard()
-                )
+        u = get_user(user_id)
+        if u and u["day"] > 1:
+            day_num = u["day"]
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит ты должен сделать очередные 100 отжиманий! Удачи! {CLOVER}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
         times = get_reminder_times(start_time, end_time, reminders_count)
         now = datetime.now(KIEV_TZ)
         today = now.date()
@@ -220,9 +225,7 @@ async def send_reminders_loop(application, user_id, chat_id):
         if seconds_to_end > 0:
             await asyncio.sleep(seconds_to_end)
         u = get_user(user_id)
-        if skip_today:
-            skip_today = False
-        elif u:
+        if u:
             user_name = u["username"] or u["name"] or "друг"
             if u["pushups_today"] >= 100:
                 next_day(user_id)
@@ -471,7 +474,6 @@ async def check_end_of_day(user_id, update):
             )
 
 async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Тестовая команда: только для ADMIN_ID
     if update.effective_user.id != ADMIN_ID:
         return
     user = update.effective_user
