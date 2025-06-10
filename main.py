@@ -58,6 +58,8 @@ ROAD = "🛣️"
 UP = "📈"
 SETTINGS = "⚙️"
 
+BACK = "⬅️ Назад"
+
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
@@ -77,9 +79,16 @@ def get_main_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-def get_yes_no_keyboard():
+def get_yes_no_back_keyboard():
     keyboard = [
-        [KeyboardButton("✅ Да"), KeyboardButton("❌ Нет")]
+        [KeyboardButton("✅ Да"), KeyboardButton("❌ Нет")],
+        [KeyboardButton(BACK)]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
+def get_back_keyboard():
+    keyboard = [
+        [KeyboardButton(BACK)]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
@@ -438,7 +447,7 @@ async def settings_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     start_time = u["start_time"] if u else "не задано"
     await update.message.reply_text(
         f"Изменить время начала дня? (текущее время: {start_time})",
-        reply_markup=get_yes_no_keyboard()
+        reply_markup=get_yes_no_back_keyboard()
     )
     return SETTINGS_ASK_START
 
@@ -447,38 +456,45 @@ async def settings_ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = update.effective_user
     u = get_user(user.id)
     end_time = u["end_time"] if u else "не задано"
+
+    if answer == BACK:
+        return await settings_entry(update, context)
     if answer == "✅ Да":
         await update.message.reply_text(
             "Введи новое время начала дня в формате ЧЧ:ММ (например, 07:00):",
-            reply_markup=ReplyKeyboardRemove()
+            reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_START
     else:
         context.user_data["new_start_time"] = None
         await update.message.reply_text(
             f"Изменить время конца дня? (текущее время: {end_time})",
-            reply_markup=get_yes_no_keyboard()
+            reply_markup=get_yes_no_back_keyboard()
         )
         return SETTINGS_ASK_END
 
 async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     time_text = update.message.text.strip()
+    if time_text == BACK:
+        return await settings_entry(update, context)
     if not is_valid_time(time_text):
         await update.message.reply_text(
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00):"
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00):",
+            reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_START
     user_db = get_user(update.effective_user.id)
     end_time = context.user_data.get("new_end_time") or user_db["end_time"]
     if time_to_minutes(time_text) >= time_to_minutes(end_time):
         await update.message.reply_text(
-            "Время конца дня должно быть позже времени начала дня! Попробуй снова.\nВведи новое время начала дня в формате ЧЧ:ММ (например, 07:00):"
+            "Время конца дня должно быть позже времени начала дня! Попробуй снова.\nВведи новое время начала дня в формате ЧЧ:ММ (например, 07:00):",
+            reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_START
     context.user_data["new_start_time"] = time_text
     await update.message.reply_text(
         f"Изменить время конца дня? (текущее время: {end_time})",
-        reply_markup=get_yes_no_keyboard()
+        reply_markup=get_yes_no_back_keyboard()
     )
     return SETTINGS_ASK_END
 
@@ -487,48 +503,71 @@ async def settings_ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     u = get_user(user.id)
     reminders = u["reminders"] if u else "не задано"
+
+    if answer == BACK:
+        return await settings_entry(update, context)
     if answer == "✅ Да":
         await update.message.reply_text(
             "Введи новое время конца дня в формате ЧЧ:ММ (например, 22:00):",
-            reply_markup=ReplyKeyboardRemove()
+            reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_END
     else:
         context.user_data["new_end_time"] = None
         await update.message.reply_text(
             f"Изменить количество напоминаний? (текущее количество: {reminders})",
-            reply_markup=get_yes_no_keyboard()
+            reply_markup=get_yes_no_back_keyboard()
         )
         return SETTINGS_ASK_REMINDERS
 
 async def settings_input_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     time_text = update.message.text.strip()
+    if time_text == BACK:
+        user = update.effective_user
+        u = get_user(user.id)
+        start_time = u["start_time"] if u else "не задано"
+        await update.message.reply_text(
+            f"Изменить время начала дня? (текущее время: {start_time})",
+            reply_markup=get_yes_no_back_keyboard()
+        )
+        return SETTINGS_ASK_START
     if not is_valid_time(time_text):
         await update.message.reply_text(
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00):"
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00):",
+            reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_END
     user_db = get_user(update.effective_user.id)
     start_time = context.user_data.get("new_start_time") or user_db["start_time"]
     if time_to_minutes(time_text) <= time_to_minutes(start_time):
         await update.message.reply_text(
-            "Время конца дня должно быть позже времени начала дня! Попробуй снова.\nВведи новое время конца дня в формате ЧЧ:ММ (например, 22:00):"
+            "Время конца дня должно быть позже времени начала дня! Попробуй снова.\nВведи новое время конца дня в формате ЧЧ:ММ (например, 22:00):",
+            reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_END
     context.user_data["new_end_time"] = time_text
     reminders = user_db["reminders"] if user_db else "не задано"
     await update.message.reply_text(
         f"Изменить количество напоминаний? (текущее количество: {reminders})",
-        reply_markup=get_yes_no_keyboard()
+        reply_markup=get_yes_no_back_keyboard()
     )
     return SETTINGS_ASK_REMINDERS
 
 async def settings_ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = update.message.text
+    if answer == BACK:
+        user = update.effective_user
+        u = get_user(user.id)
+        end_time = u["end_time"] if u else "не задано"
+        await update.message.reply_text(
+            f"Изменить время конца дня? (текущее время: {end_time})",
+            reply_markup=get_yes_no_back_keyboard()
+        )
+        return SETTINGS_ASK_END
     if answer == "✅ Да":
         await update.message.reply_text(
             "Введи новое количество напоминаний (от 2 до 10):",
-            reply_markup=ReplyKeyboardRemove()
+            reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_REMINDERS
     else:
@@ -536,16 +575,28 @@ async def settings_ask_reminders(update: Update, context: ContextTypes.DEFAULT_T
         return await settings_apply(update, context)
 
 async def settings_input_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if text == BACK:
+        user = update.effective_user
+        u = get_user(user.id)
+        reminders = u["reminders"] if u else "не задано"
+        await update.message.reply_text(
+            f"Изменить количество напоминаний? (текущее количество: {reminders})",
+            reply_markup=get_yes_no_back_keyboard()
+        )
+        return SETTINGS_ASK_REMINDERS
     try:
-        reminders = int(update.message.text)
+        reminders = int(text)
     except ValueError:
         await update.message.reply_text(
-            "Пожалуйста, введи число (от 2 до 10):"
+            "Пожалуйста, введи число (от 2 до 10):",
+            reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_REMINDERS
     if reminders < 2 or reminders > 10:
         await update.message.reply_text(
-            "Число должно быть от 2 до 10:"
+            "Число должно быть от 2 до 10:",
+            reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_REMINDERS
     context.user_data["new_reminders"] = reminders
