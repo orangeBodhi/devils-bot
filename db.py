@@ -61,7 +61,7 @@ def add_pushups(user_id, count):
     if not user:
         return False
     pushups_today = user["pushups_today"] + count
-    # Убрано ограничение на 100 — теперь можно превысить сотню!
+    # Убрана проверка на >100 — теперь можно один раз превысить 100!
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("UPDATE users SET pushups_today=? WHERE user_id=?", (pushups_today, user_id))
