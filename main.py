@@ -97,17 +97,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_db = get_user(user.id)
     if user_db:
         await update.message.reply_text(
-            "Ты уже зарегистрирован! Напиши /reset, чтобы начать заново.", reply_markup=get_main_keyboard()
+            "Ты уже зарегистрирован! Напиши /reset, чтобы начать заново.",
+            reply_markup=get_main_keyboard()
         )
         return ConversationHandler.END
-    await update.message.reply_text("Как к тебе обращаться? 📝", reply_markup=get_main_keyboard())
+    await update.message.reply_text("Как к тебе обращаться? 📝")
     return ASK_NAME
 
 async def ask_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["name"] = update.message.text
     await update.message.reply_text(
-        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 07:00), когда бот начинает работать (начало дня) и ты сможешь записывать свои отжимания🕒",
-        reply_markup=get_main_keyboard()
+        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 07:00), когда бот начинает работать (начало дня) и ты сможешь записывать свои отжимания🕒"
     )
     return ASK_START_TIME
 
@@ -115,14 +115,12 @@ async def ask_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     time_text = update.message.text.strip()
     if not is_valid_time(time_text):
         await update.message.reply_text(
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00)",
-            reply_markup=get_main_keyboard()
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00)"
         )
         return ASK_START_TIME
     context.user_data["start_time"] = time_text
     await update.message.reply_text(
-        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 22:00), когда бот завершает работу (конец дня) 🕒 и ты больше не сможешь добавлять отжимания в этот день",
-        reply_markup=get_main_keyboard()
+        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 22:00), когда бот завершает работу (конец дня) 🕒 и ты больше не сможешь добавлять отжимания в этот день"
     )
     return ASK_END_TIME
 
@@ -130,8 +128,7 @@ async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     time_text = update.message.text.strip()
     if not is_valid_time(time_text):
         await update.message.reply_text(
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00)",
-            reply_markup=get_main_keyboard()
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00)"
         )
         return ASK_END_TIME
 
@@ -141,15 +138,13 @@ async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if time_to_minutes(end_time) <= time_to_minutes(start_time):
         await update.message.reply_text(
             "Время конца дня должно быть позже времени начала дня!\n"
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00), когда бот завершает работу (конец дня)",
-            reply_markup=get_main_keyboard()
+            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00), когда бот завершает работу (конец дня)"
         )
         return ASK_END_TIME
 
     context.user_data["end_time"] = end_time
     await update.message.reply_text(
-        "Сколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔",
-        reply_markup=get_main_keyboard()
+        "Сколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
     )
     return ASK_REMINDERS
 
@@ -158,14 +153,12 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reminders = int(update.message.text)
     except ValueError:
         await update.message.reply_text(
-            "Пожалуйста, введи число (от 2 до 10)\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔",
-            reply_markup=get_main_keyboard()
+            "Пожалуйста, введи число (от 2 до 10)\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
         )
         return ASK_REMINDERS
     if reminders < 2 or reminders > 10:
         await update.message.reply_text(
-            "Число должно быть от 2 до 10\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔",
-            reply_markup=get_main_keyboard()
+            "Число должно быть от 2 до 10\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔"
         )
         return ASK_REMINDERS
     context.user_data["reminders"] = reminders
@@ -191,7 +184,10 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     reset_user(user.id)
-    await update.message.reply_text("Все данные сброшены! Можешь пройти регистрацию заново через /start.", reply_markup=ReplyKeyboardRemove())
+    await update.message.reply_text(
+        "Все данные сброшены! Можешь пройти регистрацию заново через /start.",
+        reply_markup=ReplyKeyboardRemove()
+    )
 
 async def add_pushups_generic(update, context, count):
     user = update.effective_user
