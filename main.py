@@ -59,7 +59,7 @@ SKULL = "💀"
 ROAD = "🛣️"
 UP = "📈"
 SETTINGS = "⚙️"
-LEADERBOARD = "🏆 Таблица лидеров"
+LEADERBOARD = "🏆 Топ учасників"
 
 BACK = "⬅️ Назад"
 CANCEL_EMOJI = "🛑"
@@ -80,16 +80,16 @@ KIEV_TZ = timezone("Europe/Kyiv")
 
 def get_main_keyboard():
     keyboard = [
-        [KeyboardButton("🎯 +10 отжиманий"), KeyboardButton("🎯 +15 отжиманий")],
-        [KeyboardButton("🎯 +20 отжиманий"), KeyboardButton("🎯 +25 отжиманий")],
-        [KeyboardButton("🎲 Другое число"), KeyboardButton("🏅 Мой статус")],
-        [KeyboardButton(f"{SETTINGS} Настройки"), KeyboardButton(LEADERBOARD)],
+        [KeyboardButton("🎯 +10 віджимань"), KeyboardButton("🎯 +15 віджимань")],
+        [KeyboardButton("🎯 +20 віджимань"), KeyboardButton("🎯 +25 віджимань")],
+        [KeyboardButton("🎲 Інша кількість"), KeyboardButton("🏅 Мій статус")],
+        [KeyboardButton(f"{SETTINGS} Налаштування"), KeyboardButton(LEADERBOARD)],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 def get_yes_no_back_keyboard():
     keyboard = [
-        [KeyboardButton("✅ Да"), KeyboardButton("❌ Нет")],
+        [KeyboardButton("✅ Так"), KeyboardButton("❌ Ні")],
         [KeyboardButton(BACK)]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
@@ -101,7 +101,7 @@ def get_back_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 def get_settings_only_keyboard():
     keyboard = [
-        [KeyboardButton(f"{SETTINGS} Настройки")]
+        [KeyboardButton(f"{SETTINGS} Налаштування")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -204,14 +204,14 @@ async def send_reminders_loop(application, user_id, chat_id):
             if day_num == 1:
                 await application.bot.send_message(
                     chat_id=chat_id,
-                    text=f"{DEVIL} Приветствую в Devil's 100 challenge, *{u['username'] or u['name'] or 'друг'}*! Сегодня первый день челленджа, а значит тебе необходимо сделать первые 100 отжиманий! Удачи! {CLOVER}",
+                    text=f"{DEVIL} Вітаю в Devil's 100 Challenge, *{u['username'] or u['name'] or 'друже'}*! Сьогодні перший день челленджу, а отже тебі необхідно зробити перші 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
                     parse_mode="Markdown",
                     reply_markup=get_main_keyboard()
                 )
             else:
                 await application.bot.send_message(
                     chat_id=chat_id,
-                    text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит тебе необходимо сделать очередные 100 отжиманий! Удачи! {CLOVER}",
+                    text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
                     parse_mode="Markdown",
                     reply_markup=get_main_keyboard()
                 )
@@ -226,10 +226,10 @@ async def send_reminders_loop(application, user_id, chat_id):
                 # Проверяем pushups только в этот момент
                 pushups = get_pushups_today(user_id)
                 if pushups < 100:
-                    user_name = u["username"] or u["name"] or "друг"
+                    user_name = u["username"] or u["name"] or "друже"
                     await application.bot.send_message(
                         chat_id=chat_id,
-                        text=f"Осталось 15 минут до конца дня! Или увеличь в настройках 'конец дня' или доделай отжимания. За работу, {user_name}! 👊",
+                        text=f"Лишилось 15 хвилин до кінця дня! Або збільшуй в налаштуваннях 'кінець дня' або добивай віджимання. За роботу, {user_name}! 👊",
                         reply_markup=get_main_keyboard()
                     )
             extra_task = asyncio.create_task(extra_reminder())
@@ -252,7 +252,7 @@ async def send_reminders_loop(application, user_id, chat_id):
                     continue
                 await application.bot.send_message(
                     chat_id=chat_id,
-                    text="Эй! Ты не забыл(а) про челлендж? Отожмись! 💪",
+                    text="Агов! Ти не забув(ла) про челлендж? Відожмись! 💪",
                     reply_markup=get_main_keyboard()
                 )
 
@@ -268,7 +268,7 @@ async def send_reminders_loop(application, user_id, chat_id):
             # --- Итог дня ---
             u = get_user(user_id)
             if u:
-                user_name = u["username"] or u["name"] or "друг"
+                user_name = u["username"] or u["name"] or "друже"
                 if u["pushups_today"] >= 100:
                     day_completed = u["day"]
                     next_day(user_id)
@@ -276,12 +276,12 @@ async def send_reminders_loop(application, user_id, chat_id):
                         await application.bot.send_message(
                             chat_id=chat_id,
                             text=(
-                                "🎉 Поздравляю с победой в Devil's 100 Challenge! 💪🔥\n"
-                                "Ты доказал(а), что сила — не только в мышцах, но и в характере.\n"
-                                "Каждое утро, каждый подход, каждая капля пота — это шаг к победе над собой.\n"
-                                "Ты — вдохновение для всех, кто стремится к дисциплине и самосовершенствованию! 🌟\n"
-                                "👏 Браво, чемпион! Пусть этот успех станет лишь началом новых достижений! 🚀\n"
-                                "🏆 #90днейсилы #ЖелезнаяВоля👊"
+                                "🎉 Вітаю з перемогою в Devil's 100 Challenge! 💪🔥\n"
+                                "Ти довів(ла), що сила — не лише в м'язах, а й у характері.\n"
+                                "Кожен ранок, кожен підхід, кожна крапля поту — це крок до перемоги над собою.\n"
+                                "Ти — натхнення для всіх, хто прагне до дісципліни та самовдосконалення! 🌟\n"
+                                "👏 Браво, чемпіоне! Нехай цей успіх стане лише початком нових звершень! 🚀\n"
+                                "🏆 #90ДнівСили #ЗалізнаВоля👊"
                             ),
                             parse_mode="Markdown",
                             reply_markup=get_main_keyboard()
@@ -289,7 +289,7 @@ async def send_reminders_loop(application, user_id, chat_id):
                     else:
                         await application.bot.send_message(
                             chat_id=chat_id,
-                            text=f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
+                            text=f"Вітаю, *{user_name}*, ти молодець! Сьогоднішня сотка зроблена, побачимося завтра! {STRONG}",
                             parse_mode="Markdown",
                             reply_markup=get_main_keyboard()
                         )
@@ -298,14 +298,14 @@ async def send_reminders_loop(application, user_id, chat_id):
                     if fails < 3:
                         await application.bot.send_message(
                             chat_id=chat_id,
-                            text=f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил(а) сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
+                            text=f"Пу-пу-пу… *{user_name}*, сьогодні ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
                             parse_mode="Markdown",
                             reply_markup=get_main_keyboard()
                         )
                     else:
                         await application.bot.send_message(
                             chat_id=chat_id,
-                            text=f"К сожалению ты зафейлил(а) третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
+                            text=f"Нажаль ти зафейлив(ла) третій раз! {SKULL}\nДля тебе, *{user_name}*, Devil's 100 Challenge закінчено… цього разу!\nДля перезапуску напиши /reset",
                             reply_markup=ReplyKeyboardRemove(),
                             parse_mode="Markdown"
                         )
@@ -324,17 +324,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_db = get_user(user.id)
     if user_db:
         await update.message.reply_text(
-            "Ты уже зарегистрирован(а)! Напиши /reset, чтобы начать заново.",
+            "Ти вже зареєстрований(на)! Напиши /reset, щоб розпочати все з нуля.",
             reply_markup=get_main_keyboard()
         )
         return ConversationHandler.END
-    await update.message.reply_text("Как к тебе обращаться? 📝")
+    await update.message.reply_text("Як до тебе звертатись? 📝")
     return ASK_NAME
 
 async def ask_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["name"] = update.message.text
     await update.message.reply_text(
-        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 07:00), когда бот начинает работать (начало дня) и ты сможешь записывать свои отжимания🕒"
+        "Вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00), коли бот починає працювати (початок дня) й коли ти зможешь почати записувати свої віджимання 🕒"
     )
     return ASK_START_TIME
 
@@ -342,12 +342,12 @@ async def ask_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     time_text = update.message.text.strip()
     if not is_valid_time(time_text):
         await update.message.reply_text(
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00)"
+            "Будь ласка, вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00)"
         )
         return ASK_START_TIME
     context.user_data["start_time"] = time_text
     await update.message.reply_text(
-        "Укажи время в формате ЧАСЫ:МИНУТЫ (например, 22:00), когда бот завершает работу (конец дня) 🕒 и ты больше не сможешь добавлять отжимания в этот день"
+        "Вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 22:00), коли бот завершує роботу (кінець дня) 🕒 й ти більше не зможеш додавати віджимання в цей день"
     )
     return ASK_END_TIME
 
@@ -355,7 +355,7 @@ async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     time_text = update.message.text.strip()
     if not is_valid_time(time_text):
         await update.message.reply_text(
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00)"
+            "Будь ласка, вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 22:00)"
         )
         return ASK_END_TIME
 
@@ -364,14 +364,14 @@ async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
     if time_to_minutes(end_time) <= time_to_minutes(start_time):
         await update.message.reply_text(
-            "Время конца дня должно быть позже времени начала дня!\n"
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00), когда бот завершает работу (конец дня)"
+            "Час кінця дня має бути пізніше часу початку дня!\n"
+            "Будь ласка, вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 22:00), коли бот завершує роботу (кінець дня)"
         )
         return ASK_END_TIME
 
     context.user_data["end_time"] = end_time
     await update.message.reply_text(
-        "Сколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔 (уведомления будут равномерно распределены по рабочему дню)"
+        "Сікільки разів на день тобі нагадувать про віджимання? Мінімум 2, максимум 10 🔔 (нагадування будут рівномірно розподілені по робочему дню)"
     )
     return ASK_REMINDERS
 
@@ -380,17 +380,17 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reminders = int(update.message.text)
     except ValueError:
         await update.message.reply_text(
-            "Пожалуйста, введи число (от 2 до 10)\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔 (уведомления будут равномерно распределены по рабочему дню)"
+            "Будь ласка, вкажи число (від 2 до 10)\nСікільки разів на день тобі нагадувать про віджимання? Мінімум 2, максимум 10 🔔 (нагадування будут рівномірно розподілені по робочему дню)"
         )
         return ASK_REMINDERS
     if reminders < 2 or reminders > 10:
         await update.message.reply_text(
-            "Число должно быть от 2 до 10\nСколько раз в день тебе напоминать про отжимания? Минимум 2, максимум 10 🔔 (уведомления будут равномерно распределены по рабочему дню)"
+            "Число має бути від 2 до 10\nСікільки разів на день тобі нагадувать про віджимання? Мінімум 2, максимум 10 🔔 (нагадування будут рівномірно розподілені по робочему дню)
         )
         return ASK_REMINDERS
     context.user_data["reminders"] = reminders
     user = update.effective_user
-    user_name = context.user_data.get("name", "друг")
+    user_name = context.user_data.get("name", "друже")
 
     add_user(
         user.id,
@@ -401,7 +401,7 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     await update.message.reply_text(
-        f"{DEVIL} Поздравляю с регистрацией в Devil's 100 challenge, *{user_name}*! Ожидай начала первого дня согласно настройкам (в момент начала дня, который ты установил(а) при регистрации, и стартует челлендж!) Увидимся! 👋",
+        f"{DEVIL} Вітаю з реєстрацією в Devil's 100 Challenge, *{user_name}*! Очікуй на початок першого дня згідно з налаштуваннями (в момент початку дня, який ти встановив(ла) при реєстрації, і стартує челендж!) Побачимось! 👋",
         reply_markup=get_settings_only_keyboard(),
         parse_mode="Markdown"
     )
@@ -417,16 +417,16 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
         old_task.cancel()
         reminder_tasks.pop(user.id)
     await update.message.reply_text(
-        "Все данные сброшены! Можешь пройти регистрацию заново через /start.",
+        "Усі дані скинуто! Можеш пройти реєстрацію наново через /start.",
         reply_markup=ReplyKeyboardRemove()
     )
 
 def parse_pushup_command(text):
     mapping = {
-        "🎯 +10 отжиманий": 10,
-        "🎯 +15 отжиманий": 15,
-        "🎯 +20 отжиманий": 20,
-        "🎯 +25 отжиманий": 25
+        "🎯 +10 віджимань": 10,
+        "🎯 +15 віджимань": 15,
+        "🎯 +20 віджимань": 20,
+        "🎯 +25 віджимань": 25
     }
     return mapping.get(text.strip(), None)
 
@@ -434,15 +434,15 @@ async def add_pushups_generic(update, context, count):
     user = update.effective_user
     user_db = get_user(user.id)
     if not user_db:
-        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
+        await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
         return
 
-    user_name = user_db["username"] or user_db["name"] or "друг"
+    user_name = user_db["username"] or user_db["name"] or "друже"
     cur = user_db["pushups_today"]
 
     if cur >= 100:
         await update.message.reply_text(
-            "Нельзя добавить больше 100 отжиманий за день!",
+            "Не можна додавати більше 100 віджимань на день!",
             reply_markup=get_main_keyboard()
         )
         return
@@ -451,24 +451,24 @@ async def add_pushups_generic(update, context, count):
     new_count = get_pushups_today(user.id)
 
     await update.message.reply_text(
-        f"Отлично! {emoji_number(count)} отжиманий добавлено к сегодняшнему прогрессу {UP}",
+        f"Чудово! {emoji_number(count)} віджимань додано до сьогоднішнього прогресу {UP}",
         parse_mode="Markdown",
         reply_markup=get_main_keyboard()
     )
     await update.message.reply_text(
-        f"Текущий прогресс: {emoji_number(new_count)}",
+        f"Поточний прогрес: {emoji_number(new_count)}",
         reply_markup=get_main_keyboard()
     )
     if new_count >= 100 and cur < 100:
         await update.message.reply_text(
-            f"Юху! *{user_name}*, сегодняшняя сотка сделана! Поздравляю! {STRONG} 💯",
+            f"Юху! *{user_name}*, сьогоднішня сотка зроблена! Вітаю! {STRONG} 💯",
             parse_mode="Markdown",
             reply_markup=get_main_keyboard()
         )
 
 async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_custom"] = True
-    await update.message.reply_text("Введи количество сделанных отжиманий (например, 13):", reply_markup=get_main_keyboard())
+    await update.message.reply_text("Вкажи кількість зроблених віджимань (наприклад, 13):", reply_markup=get_main_keyboard())
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -476,20 +476,20 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
     if count is not None:
         await add_pushups_generic(update, context, count)
         return
-    if text == "🎲 Другое число":
+    if text == "🎲 Інша кількість":
         await add_custom(update, context)
         return
-    if text == "🏅 Мой статус":
+    if text == "🏅 Мій статус":
         await status(update, context)
         return
-    if text == f"{SETTINGS} Настройки":
+    if text == f"{SETTINGS} Налаштування":
         await settings_entry(update, context)
         return
     if context.user_data.get("awaiting_custom"):
         try:
             count = int(text)
         except ValueError:
-            await update.message.reply_text("Пожалуйста, введи число.", reply_markup=get_main_keyboard())
+            await update.message.reply_text("Будь ласка, вкажи число", reply_markup=get_main_keyboard())
             return
         await add_pushups_generic(update, context, count)
         context.user_data["awaiting_custom"] = False
@@ -498,7 +498,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     u = get_user(user.id)
     if not u:
-        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
+        await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
         return
     day = u["day"]
     fails = u["fails"]
@@ -516,29 +516,29 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     top = get_top_pushups_today(5)
     if not top:
-        await update.message.reply_text("Пока еще никто не отжимался сегодня! Будь первым! 💪", reply_markup=get_main_keyboard())
+        await update.message.reply_text("Поки ще ніхто не віджимався сьогодні! Будь першим! 💪", reply_markup=get_main_keyboard())
         return
     msg = f"{LEADERBOARD}\n\n"
     for idx, user in enumerate(top, 1):
-        name = user["username"] or user["name"] or "Безымянный"
+        name = user["username"] or user["name"] or "Безіменний"
         count = user["pushups_today"]
-        msg += f"{idx}. {name} — {count} отжиманий\n"
+        msg += f"{idx}. {name} — {count} віджимань\n"
     await update.message.reply_text(msg, reply_markup=get_main_keyboard())
 
 async def check_end_of_day(user_id, update):
     u = get_user(user_id)
-    user_name = u["username"] or u["name"] or "друг"
+    user_name = u["username"] or u["name"] or "друже"
     if u and u["pushups_today"] < 100:
         fails = fail_day(user_id)
         if fails < 3:
             await update.message.reply_text(
-                f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил(а) сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
+                f"Пу-пу-пу… *{user_name}*, сьогодні ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
                 parse_mode="Markdown",
                 reply_markup=get_main_keyboard()
             )
         else:
             await update.message.reply_text(
-                f"К сожалению ты зафейлил(а) третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
+                f"Нажаль ти зафейлив(ла) третій раз! {SKULL}\nДля тебе, *{user_name}*, Devil's 100 Challenge закінчено… цього разу!\nДля перезапуску напиши /reset",
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode="Markdown"
             )
@@ -548,16 +548,16 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user = update.effective_user
     u = get_user(user.id)
-    user_name = u["username"] or u["name"] or "друг"
+    user_name = u["username"] or u["name"] or "друже"
     if not u:
-        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
+        await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
         return
     if u["pushups_today"] < 100:
         await check_end_of_day(user.id, update)
     else:
         next_day(user.id)
         await update.message.reply_text(
-            f"Поздравляю, *{user_name}*, ты молодец! Сегодняшняя сотка сделана, увидимся завтра! {STRONG}",
+            f"Вітаю, *{user_name}*, ти молодець! Сьогоднішня сотка зроблена, побачимося завтра! {STRONG}",
             parse_mode="Markdown",
             reply_markup=get_main_keyboard()
         )
@@ -584,7 +584,7 @@ async def add25(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cancel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        f"Все изменения отменены {CANCEL_EMOJI}",
+        f"Усі зміни скасовані! {CANCEL_EMOJI}",
         reply_markup=get_main_keyboard()
     )
     return ConversationHandler.END
@@ -594,7 +594,7 @@ async def settings_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u = get_user(user.id)
     start_time = u["start_time"] if u else "не задано"
     await update.message.reply_text(
-        f"Изменить время начала дня? (текущее время: {start_time})",
+        f"Змінити час початку дня? (поточне значення: {start_time})",
         reply_markup=get_yes_no_back_keyboard()
     )
     return SETTINGS_ASK_START
@@ -607,15 +607,15 @@ async def settings_ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if answer == BACK:
         return await cancel_settings(update, context)
-    if answer == "✅ Да":
+    if answer == "✅ Так":
         await update.message.reply_text(
-            "Введи новое время начала дня в формате ЧЧ:ММ (например, 07:00):",
+            "Вкажи новий час початку дня в форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00):",
             reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_START
     else:
         await update.message.reply_text(
-            f"Изменить время конца дня? (текущее время: {end_time})",
+            f"Змінити час кінця дня? (поточне значення: {end_time})",
             reply_markup=get_yes_no_back_keyboard()
         )
         return SETTINGS_ASK_END
@@ -626,7 +626,7 @@ async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYP
         return await cancel_settings(update, context)
     if not is_valid_time(time_text):
         await update.message.reply_text(
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 07:00):",
+            "Будь ласка, вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00):",
             reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_START
@@ -634,13 +634,13 @@ async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYP
     end_time = context.user_data.get("new_end_time") or user_db["end_time"]
     if time_to_minutes(time_text) >= time_to_minutes(end_time):
         await update.message.reply_text(
-            "Время конца дня должно быть позже времени начала дня! Попробуй снова.\nВведи новое время начала дня в формате ЧЧ:ММ (например, 07:00):",
+            "Час кінця дня має бути візніше часу початку дня! Спробуй знову.\nВкажи новий час початку дня в форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00):",
             reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_START
     context.user_data["new_start_time"] = time_text
     await update.message.reply_text(
-        f"Изменить время конца дня? (текущее время: {end_time})",
+        f"Змінити час кінця дня? (поточне значення: {end_time})",
         reply_markup=get_yes_no_back_keyboard()
     )
     return SETTINGS_ASK_END
@@ -653,15 +653,15 @@ async def settings_ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if answer == BACK:
         return await cancel_settings(update, context)
-    if answer == "✅ Да":
+    if answer == "✅ Так":
         await update.message.reply_text(
-            "Введи новое время конца дня в формате ЧЧ:ММ (например, 22:00):",
+            "Вкажи новий час кінця дня в форматі ГОДИНИ:ХВИЛИНИ (наприклад, 22:00):",
             reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_END
     else:
         await update.message.reply_text(
-            f"Изменить количество напоминаний? (текущее количество: {reminders})",
+            f"Змінити кількість нагадувань? (зараз їх кількість: {reminders} рвіномірно протягом робочого дня)",
             reply_markup=get_yes_no_back_keyboard()
         )
         return SETTINGS_ASK_REMINDERS
@@ -672,7 +672,7 @@ async def settings_input_end(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return await cancel_settings(update, context)
     if not is_valid_time(time_text):
         await update.message.reply_text(
-            "Пожалуйста, укажи время в формате ЧЧ:ММ (например, 22:00):",
+            "Будь ласка, вкажи час в форматі ГОДИНИ:ХВИЛИНИ (наприклад, 22:00):",
             reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_END
@@ -680,14 +680,14 @@ async def settings_input_end(update: Update, context: ContextTypes.DEFAULT_TYPE)
     start_time = context.user_data.get("new_start_time") or user_db["start_time"]
     if time_to_minutes(time_text) <= time_to_minutes(start_time):
         await update.message.reply_text(
-            "Время конца дня должно быть позже времени начала дня! Попробуй снова.\nВведи новое время конца дня в формате ЧЧ:ММ (например, 22:00):",
+            "Час кінця дня має бути пізніше часу початку дня! Спробуй знову.\nВкажи новий час кінця дня в форматі ГОДИНИ:ХВИЛИНИ (наприклад, 22:00):",
             reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_END
     context.user_data["new_end_time"] = time_text
     reminders = user_db["reminders"] if user_db else "не задано"
     await update.message.reply_text(
-        f"Изменить количество напоминаний? (текущее количество: {reminders})",
+        f"Змінити кількість нагадувань? (зараз їх кількість: {reminders} рвіномірно протягом робочого дня)",
         reply_markup=get_yes_no_back_keyboard()
     )
     return SETTINGS_ASK_REMINDERS
@@ -696,9 +696,9 @@ async def settings_ask_reminders(update: Update, context: ContextTypes.DEFAULT_T
     answer = update.message.text
     if answer == BACK:
         return await cancel_settings(update, context)
-    if answer == "✅ Да":
+    if answer == "✅ Так":
         await update.message.reply_text(
-            "Введи новое количество напоминаний (от 2 до 10):",
+            "Вкажи нову кількість нагадувань (від 2 до 10)",
             reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_REMINDERS
@@ -713,13 +713,13 @@ async def settings_input_reminders(update: Update, context: ContextTypes.DEFAULT
         reminders = int(text)
     except ValueError:
         await update.message.reply_text(
-            "Пожалуйста, введи число (от 2 до 10):",
+            "Будь ласка, вкажи число (від 2 до 10):",
             reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_REMINDERS
     if reminders < 2 or reminders > 10:
         await update.message.reply_text(
-            "Число должно быть от 2 до 10:",
+            "Число має бути від 2 до 10:",
             reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_REMINDERS
@@ -730,13 +730,13 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_db = get_user(user.id)
     if not user_db:
-        await update.message.reply_text("Сначала зарегистрируйся через /start", reply_markup=get_main_keyboard())
+        await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
         return ConversationHandler.END
 
     keys = context.user_data.keys()
     if not any(k in keys for k in ["new_start_time", "new_end_time", "new_reminders"]):
         await update.message.reply_text(
-            "Изменения не внесены.",
+            "Зміни не внесено!",
             reply_markup=get_main_keyboard()
         )
         return ConversationHandler.END
@@ -747,7 +747,7 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if time_to_minutes(end_time) <= time_to_minutes(start_time):
         await update.message.reply_text(
-            "Время конца дня должно быть позже времени начала дня! Изменения не сохранены.",
+            "Час кінця дня має бути пізніше часу початку дня! Зміни не збережено.",
             reply_markup=get_main_keyboard()
         )
         return ConversationHandler.END
@@ -756,10 +756,10 @@ async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     start_reminders(context.application, user.id, update.effective_chat.id)
 
     await update.message.reply_text(
-        "Настройки обновлены! Новое расписание напоминаний:\n"
-        f"Начало дня: {start_time}\n"
-        f"Конец дня: {end_time}\n"
-        f"Число напоминаний: {reminders}",
+        "Налаштування оновлено! Новий розклад:\n"
+        f"Початок дня: {start_time}\n"
+        f"Кінець дня: {end_time}\n"
+        f"кількість нагадувань: {reminders}",
         reply_markup=get_main_keyboard()
     )
     return ConversationHandler.END
