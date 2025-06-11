@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import date
 
-DB_PATH = "users.db"
+DB_PATH = "/data/users.db"
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
