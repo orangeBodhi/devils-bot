@@ -32,6 +32,7 @@ from db import (
     get_day,
     get_all_user_ids,
     update_user_settings,
+    get_top_pushups_today,
 )
 
 ASK_NAME, ASK_START_TIME, ASK_END_TIME, ASK_REMINDERS = range(4)
@@ -58,6 +59,7 @@ SKULL = "💀"
 ROAD = "🛣️"
 UP = "📈"
 SETTINGS = "⚙️"
+LEADERBOARD = "🏆 Таблица лидеров"
 
 BACK = "⬅️ Назад"
 CANCEL_EMOJI = "🛑"
@@ -81,7 +83,7 @@ def get_main_keyboard():
         [KeyboardButton("🎯 +10 отжиманий"), KeyboardButton("🎯 +15 отжиманий")],
         [KeyboardButton("🎯 +20 отжиманий"), KeyboardButton("🎯 +25 отжиманий")],
         [KeyboardButton("🎲 Другое число"), KeyboardButton("🏅 Мой статус")],
-        [KeyboardButton(f"{SETTINGS} Настройки")],
+        [KeyboardButton(f"{SETTINGS} Настройки")], KeyboardButton(LEADERBOARD)],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -511,6 +513,18 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg, reply_markup=get_main_keyboard())
 
+async def lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    top = get_top_pushups_today(5)
+    if not top:
+        await update.message.reply_text("Пока еще никто не отжимался сегодня! Будь первым! 💪", reply_markup=get_main_keyboard())
+        return
+    msg = f"{LEADERBOARD}\n\n"
+    for idx, user in enumerate(top, 1):
+        name = user["username"] or user["name"] or "Безымянный"
+        count = user["pushups_today"]
+        msg += f"{idx}. {name} — {count} отжиманий\n"
+    await update.message.reply_text(msg, reply_markup=get_main_keyboard())
+
 async def check_end_of_day(user_id, update):
     u = get_user(user_id)
     user_name = u["username"] or u["name"] or "друг"
@@ -819,7 +833,9 @@ def main():
     application.add_handler(CommandHandler("add25", add25))
     application.add_handler(CommandHandler("add", add_custom))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
-
+    application.add_handler(CommandHandler("lobby", lobby))
+    application.add_handler(MessageHandler(filters.Regex(f"^{LEADERBOARD}$"), lobby))
+    
     logger.info("Bot started!")
     application.post_init = on_startup
     application.run_polling()
