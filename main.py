@@ -832,10 +832,10 @@ def main():
     application.add_handler(CommandHandler("add20", add20))
     application.add_handler(CommandHandler("add25", add25))
     application.add_handler(CommandHandler("add", add_custom))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
     application.add_handler(CommandHandler("lobby", lobby))
     application.add_handler(MessageHandler(filters.Regex(f"^{LEADERBOARD}$"), lobby))
-    
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
+        
     logger.info("Bot started!")
     application.post_init = on_startup
     application.run_polling()
