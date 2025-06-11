@@ -83,7 +83,7 @@ def get_main_keyboard():
         [KeyboardButton("🎯 +10 отжиманий"), KeyboardButton("🎯 +15 отжиманий")],
         [KeyboardButton("🎯 +20 отжиманий"), KeyboardButton("🎯 +25 отжиманий")],
         [KeyboardButton("🎲 Другое число"), KeyboardButton("🏅 Мой статус")],
-        [KeyboardButton(f"{SETTINGS} Настройки")], KeyboardButton(LEADERBOARD)],
+        [KeyboardButton(f"{SETTINGS} Настройки"), KeyboardButton(LEADERBOARD)],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
