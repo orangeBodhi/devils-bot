@@ -202,14 +202,14 @@ async def send_reminders_loop(application, user_id, chat_id):
             if day_num == 1:
                 await application.bot.send_message(
                     chat_id=chat_id,
-                    text=f"{DEVIL} Приветствую в Devil's 100 challenge, *{u['username'] or u['name'] or 'друг'}*! Сегодня первый день челленджа, а значит ты должен сделать первые 100 отжиманий! Удачи! {CLOVER}",
+                    text=f"{DEVIL} Приветствую в Devil's 100 challenge, *{u['username'] or u['name'] or 'друг'}*! Сегодня первый день челленджа, а значит тебе необходимо сделать первые 100 отжиманий! Удачи! {CLOVER}",
                     parse_mode="Markdown",
                     reply_markup=get_main_keyboard()
                 )
             else:
                 await application.bot.send_message(
                     chat_id=chat_id,
-                    text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит ты должен сделать очередные 100 отжиманий! Удачи! {CLOVER}",
+                    text=f"Снова приветствую в Devil's 100 challenge! {DEVIL} Сегодня {emoji_number(day_num)} день челенджа, а значит тебе необходимо сделать очередные 100 отжиманий! Удачи! {CLOVER}",
                     parse_mode="Markdown",
                     reply_markup=get_main_keyboard()
                 )
@@ -250,7 +250,7 @@ async def send_reminders_loop(application, user_id, chat_id):
                     continue
                 await application.bot.send_message(
                     chat_id=chat_id,
-                    text="Эй! Ты не забыл про челлендж? Отожмись! 💪",
+                    text="Эй! Ты не забыл(а) про челлендж? Отожмись! 💪",
                     reply_markup=get_main_keyboard()
                 )
 
@@ -296,14 +296,14 @@ async def send_reminders_loop(application, user_id, chat_id):
                     if fails < 3:
                         await application.bot.send_message(
                             chat_id=chat_id,
-                            text=f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
+                            text=f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил(а) сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
                             parse_mode="Markdown",
                             reply_markup=get_main_keyboard()
                         )
                     else:
                         await application.bot.send_message(
                             chat_id=chat_id,
-                            text=f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
+                            text=f"К сожалению ты зафейлил(а) третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
                             reply_markup=ReplyKeyboardRemove(),
                             parse_mode="Markdown"
                         )
@@ -322,7 +322,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_db = get_user(user.id)
     if user_db:
         await update.message.reply_text(
-            "Ты уже зарегистрирован! Напиши /reset, чтобы начать заново.",
+            "Ты уже зарегистрирован(а)! Напиши /reset, чтобы начать заново.",
             reply_markup=get_main_keyboard()
         )
         return ConversationHandler.END
@@ -399,7 +399,7 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     await update.message.reply_text(
-        f"{DEVIL} Поздравляю с регистрацией в Devil's 100 challenge, *{user_name}*! Ожидай начала первого дня согласно настройкам (в момент начала дня, который ты установил при регистрации, и стартует челлендж!) Увидимся! 👋",
+        f"{DEVIL} Поздравляю с регистрацией в Devil's 100 challenge, *{user_name}*! Ожидай начала первого дня согласно настройкам (в момент начала дня, который ты установил(а) при регистрации, и стартует челлендж!) Увидимся! 👋",
         reply_markup=get_settings_only_keyboard(),
         parse_mode="Markdown"
     )
@@ -518,13 +518,13 @@ async def check_end_of_day(user_id, update):
         fails = fail_day(user_id)
         if fails < 3:
             await update.message.reply_text(
-                f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
+                f"Пу-пу-пу… *{user_name}*, сегодня ты не осилил(а) сотку. К сожалению это минус жизнь. У тебя осталось всего: {hearts(fails)}",
                 parse_mode="Markdown",
                 reply_markup=get_main_keyboard()
             )
         else:
             await update.message.reply_text(
-                f"К сожалению ты зафейлил третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
+                f"К сожалению ты зафейлил(а) третий раз! {SKULL}\nДля тебя, *{user_name}*, Devil's 100 challenge закончен… в этот раз!\nДля перезапуска напиши /reset",
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode="Markdown"
             )
