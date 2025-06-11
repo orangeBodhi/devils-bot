@@ -137,3 +137,14 @@ def get_all_user_ids():
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM users")
     return [row["user_id"] for row in cur.fetchall()]
+
+def get_top_pushups_today(limit=5):
+    from datetime import date
+    conn = get_db()
+    cur = conn.cursor()
+    today_str = date.today().isoformat()
+    cur.execute(
+        "SELECT username, name, pushups_today FROM users WHERE last_date=? ORDER BY pushups_today DESC LIMIT ?",
+        (today_str, limit)
+    )
+    return cur.fetchall()
