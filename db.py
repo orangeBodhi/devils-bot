@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 
 DB_PATH = "/data/users.db"
 
@@ -22,7 +22,8 @@ def init_db():
             day INTEGER DEFAULT 1,
             pushups_today INTEGER DEFAULT 0,
             last_date TEXT,
-            fails INTEGER DEFAULT 0
+            fails INTEGER DEFAULT 0,
+            completed_time TEXT
         )
     """)
     conn.commit()
@@ -35,8 +36,8 @@ def add_user(user_id, name, start_time, end_time, reminders, username=None):
         return
     cur.execute(
         """
-        INSERT INTO users (user_id, username, name, start_time, end_time, reminders, day, pushups_today, last_date, fails)
-        VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, 0)
+        INSERT INTO users (user_id, username, name, start_time, end_time, reminders, day, pushups_today, last_date, fails, completed_time)
+        VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, 0, NULL)
         """,
         (user_id, username, name, start_time, end_time, reminders, date.today().isoformat())
     )
@@ -69,20 +70,26 @@ def add_pushups(user_id, count):
     if not u:
         return False
     today_str = date.today().isoformat()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if u["last_date"] != today_str:
         pushups = 0
         day = u["day"] + 1
         fails = u["fails"]
+        completed_time = None
     else:
         pushups = u["pushups_today"]
         day = u["day"]
         fails = u["fails"]
+        completed_time = u.get("completed_time")
     new_pushups = min(pushups + count, 100)
+    # Если впервые достигли 100 — зафиксировать время
+    if new_pushups >= 100 and not completed_time:
+        completed_time = now_str
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "UPDATE users SET pushups_today=?, last_date=?, day=?, fails=? WHERE user_id=?",
-        (new_pushups, today_str, day, fails, user_id)
+        "UPDATE users SET pushups_today=?, last_date=?, day=?, fails=?, completed_time=? WHERE user_id=?",
+        (new_pushups, today_str, day, fails, completed_time, user_id)
     )
     conn.commit()
     return True
@@ -104,7 +111,7 @@ def next_day(user_id):
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "UPDATE users SET day=?, pushups_today=0, last_date=?, fails=? WHERE user_id=?",
+        "UPDATE users SET day=?, pushups_today=0, last_date=?, fails=?, completed_time=NULL WHERE user_id=?",
         (u["day"] + 1, today_str, u["fails"], user_id)
     )
     conn.commit()
@@ -118,7 +125,7 @@ def fail_day(user_id):
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "UPDATE users SET fails=?, day=?, pushups_today=0, last_date=? WHERE user_id=?",
+        "UPDATE users SET fails=?, day=?, pushups_today=0, last_date=?, completed_time=NULL WHERE user_id=?",
         (fails, u["day"] + 1, today_str, user_id)
     )
     conn.commit()
@@ -144,7 +151,16 @@ def get_top_pushups_today(limit=5):
     cur = conn.cursor()
     today_str = date.today().isoformat()
     cur.execute(
-        "SELECT username, name, pushups_today FROM users WHERE last_date=? ORDER BY pushups_today DESC LIMIT ?",
+        """
+        SELECT username, name, pushups_today, completed_time
+        FROM users
+        WHERE last_date=?
+        ORDER BY 
+            CASE WHEN pushups_today >= 100 THEN 0 ELSE 1 END,
+            completed_time ASC,
+            pushups_today DESC
+        LIMIT ?
+        """,
         (today_str, limit)
     )
     return cur.fetchall()
