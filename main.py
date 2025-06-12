@@ -522,7 +522,13 @@ async def lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for idx, user in enumerate(top, 1):
         name = user["username"] or user["name"] or "Безіменний"
         count = user["pushups_today"]
-        msg += f"{idx}. {name} — {count} віджимань\n"
+        # Показываем время финиша, если чел сделал 100+
+        if count >= 100 and user["completed_time"]:
+            # Только часы и минуты (например, 09:15)
+            time_str = user["completed_time"][11:16]
+            msg += f"{idx}. {name} — {count} віджимань (фініш о {time_str})\n"
+        else:
+            msg += f"{idx}. {name} — {count} віджимань\n"
     await update.message.reply_text(msg, reply_markup=get_main_keyboard())
 
 async def check_end_of_day(user_id, update):
