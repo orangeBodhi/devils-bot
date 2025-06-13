@@ -82,8 +82,9 @@ def get_main_keyboard():
     keyboard = [
         [KeyboardButton("🎯 +10 віджимань"), KeyboardButton("🎯 +15 віджимань")],
         [KeyboardButton("🎯 +20 віджимань"), KeyboardButton("🎯 +25 віджимань")],
-        [KeyboardButton("🎲 Інша кількість"), KeyboardButton("🏅 Мій статус")],
-        [KeyboardButton(f"{SETTINGS} Налаштування"), KeyboardButton(LEADERBOARD)],
+        [KeyboardButton("🎲 Інша кількість"), KeyboardButton("➖ Зменшити кількість")],
+        [KeyboardButton("🏅 Мій статус"), KeyboardButton("🏆 Топ учасників")],
+        [KeyboardButton(f"{SETTINGS} Налаштування")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -470,8 +471,41 @@ async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_custom"] = True
     await update.message.reply_text("Вкажи кількість зроблених віджимань (наприклад, 13):", reply_markup=get_main_keyboard())
 
+async def decrease_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    user_db = get_user(user.id)
+    if not user_db:
+        await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
+        return
+
+    await update.message.reply_text(
+        "На скільки зменшити кількість віджимань? Вкажи число (наприклад, 10):",
+        reply_markup=get_main_keyboard()
+    )
+    context.user_data["awaiting_decrease"] = True
+
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+    if context.user_data.get("awaiting_decrease"):
+        try:
+            dec_count = int(text)
+        except ValueError:
+            await update.message.reply_text("Будь ласка, вкажи число", reply_markup=get_main_keyboard())
+            return
+        user = update.effective_user
+        user_db = get_user(user.id)
+        cur = user_db["pushups_today"]
+        new_val = max(0, cur - dec_count)
+        conn = get_db()
+        cur_db = conn.cursor()
+        cur_db.execute("UPDATE users SET pushups_today=? WHERE user_id=?", (new_val, user.id))
+        conn.commit()
+        context.user_data["awaiting_decrease"] = False
+        await update.message.reply_text(
+            f"Кількість зменшено! Новий прогрес: {emoji_number(new_val)}",
+            reply_markup=get_main_keyboard()
+        )
+        return
     count = parse_pushup_command(text)
     if count is not None:
         await add_pushups_generic(update, context, count)
@@ -812,6 +846,30 @@ async def settestreminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_main_keyboard()
     )
 
+async def dump_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Только для админа!
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("Тільки для адміністратора.")
+        return
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users")
+    rows = cur.fetchall()
+    if not rows:
+        await update.message.reply_text("Таблиця пуста.")
+        return
+    msg = ""
+    for row in rows:
+        msg += (
+            f"ID: {row['user_id']}, Name: {row['name']}, Username: {row['username']}, "
+            f"Pushups: {row['pushups_today']}, Day: {row['day']}, "
+            f"Fails: {row['fails']}, Completed: {row['completed_time']}, "
+            f"LastDate: {row['last_date']}\n"
+        )
+    # Ограничим максимум до 4000 символов для Telegram
+    for i in range(0, len(msg), 4000):
+        await update.message.reply_text(msg[i:i+4000])
+
 def main():
     application = Application.builder().token(TOKEN).build()
 
@@ -855,6 +913,8 @@ def main():
     application.add_handler(CommandHandler("add", add_custom))
     application.add_handler(CommandHandler("lobby", lobby))
     application.add_handler(MessageHandler(filters.Regex(f"^{LEADERBOARD}$"), lobby))
+    application.add_handler(CommandHandler("dumpusers", dump_users))
+    application.add_handler(MessageHandler(filters.Regex("^➖ Зменшити кількість$"), decrease_pushups))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
         
     logger.info("Bot started!")
