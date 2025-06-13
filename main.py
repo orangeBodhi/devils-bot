@@ -487,17 +487,21 @@ async def decrease_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+    logging.info(f"[DEBUG] handle_custom_pushups вызвана. awaiting_decrease={context.user_data.get('awaiting_decrease')}, text={text}")
 
     # Обработка уменьшения количества отжиманий
     if context.user_data.get("awaiting_decrease"):
+        logging.info("[DEBUG] Вошли в блок уменьшения отжиманий")
         try:
             dec_count = int(text)
         except ValueError:
+            logging.info("[DEBUG] Введено не число для уменьшения")
             await update.message.reply_text(
                 "Будь ласка, вкажи число", reply_markup=get_main_keyboard()
             )
             return
         user = update.effective_user
+        logging.info(f"[DEBUG] decrease_pushups вызывается: user_id={user.id}, dec_count={dec_count}")
         new_val = decrease_pushups(user.id, dec_count)
         context.user_data["awaiting_decrease"] = False
         await update.message.reply_text(
@@ -506,32 +510,33 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return
 
-    # Быстрое добавление по кнопке
     count = parse_pushup_command(text)
     if count is not None:
+        logging.info(f"[DEBUG] Быстрое добавление: {count}")
         await add_pushups_generic(update, context, count)
         return
 
-    # Запрос на ввод индивидуального количества
     if text == "🎲 Інша кількість":
+        logging.info("[DEBUG] Индивидуальное количество отжиманий")
         await add_custom(update, context)
         return
 
-    # Статус пользователя
     if text == "🏅 Мій статус":
+        logging.info("[DEBUG] Запрос статуса")
         await status(update, context)
         return
 
-    # Вход в настройки
     if text == f"{SETTINGS} Налаштування":
+        logging.info("[DEBUG] Вход в настройки")
         await settings_entry(update, context)
         return
 
-    # Обработка индивидуального количества отжиманий
     if context.user_data.get("awaiting_custom"):
+        logging.info("[DEBUG] awaiting_custom True")
         try:
             count = int(text)
         except ValueError:
+            logging.info("[DEBUG] awaiting_custom — введено не число")
             await update.message.reply_text(
                 "Будь ласка, вкажи число", reply_markup=get_main_keyboard()
             )
