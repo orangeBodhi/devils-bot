@@ -155,10 +155,10 @@ def get_top_pushups_today(limit=5):
         SELECT username, name, pushups_today, completed_time
         FROM users
         WHERE last_date=?
-        ORDER BY 
-            CASE WHEN pushups_today >= 100 THEN 0 ELSE 1 END,
-            completed_time ASC,
-            pushups_today DESC
+        ORDER BY
+            CASE WHEN pushups_today >= 100 THEN 0 ELSE 1 END,                     -- сначала добившие 100
+            CASE WHEN pushups_today >= 100 THEN completed_time END ASC,           -- среди них — кто раньше
+            pushups_today DESC                                                    -- остальные по количеству
         LIMIT ?
         """,
         (today_str, limit)
