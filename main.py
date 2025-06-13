@@ -473,18 +473,30 @@ async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_custom"] = True
     await update.message.reply_text("Вкажи кількість зроблених віджимань (наприклад, 13):", reply_markup=get_main_keyboard())
 
-async def decrease_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    user_db = get_user(user.id)
-    if not user_db:
-        await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
-        return
+async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    logging.info(f"[DEBUG] handle_custom_pushups вызвана. awaiting_decrease={context.user_data.get('awaiting_decrease')}, text={text}")
 
-    await update.message.reply_text(
-        "На скільки зменшити кількість віджимань? Вкажи число (наприклад, 10):",
-        reply_markup=get_main_keyboard()
-    )
-    context.user_data["awaiting_decrease"] = True
+    # Обработка уменьшения количества отжиманий
+    if context.user_data.get("awaiting_decrease"):
+        logging.info("[DEBUG] Вошли в блок уменьшения отжиманий")
+        try:
+            dec_count = int(text)
+        except ValueError:
+            logging.info("[DEBUG] Введено не число для уменьшения")
+            await update.message.reply_text(
+                "Будь ласка, вкажи число", reply_markup=get_main_keyboard()
+            )
+            return
+        user = update.effective_user
+        logging.info(f"[DEBUG] decrease_pushups вызывается: user_id={user.id}, dec_count={dec_count}")
+        new_val = await decrease_pushups(user.id, dec_count)   # ← ВАЖНО: добавь await
+        context.user_data["awaiting_decrease"] = False
+        await update.message.reply_text(
+            f"Кількість зменшено! Новий прогрес: {emoji_number(new_val)}",
+            reply_markup=get_main_keyboard()
+        )
+        return
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
