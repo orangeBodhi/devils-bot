@@ -53,6 +53,7 @@ def update_user_settings(user_id, start_time, end_time, reminders):
     conn.commit()
 
 def get_user(user_id):
+    print("[DEBUG] get_user user_id:", user_id, type(user_id))
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
@@ -95,6 +96,7 @@ def add_pushups(user_id, count):
     return True
 
 def decrease_pushups(user_id, count):
+    print("[DEBUG] decrease_pushups user_id:", user_id, type(user_id))
     u = get_user(user_id)
     if not u:
         return False
