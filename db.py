@@ -1,7 +1,10 @@
 import sqlite3
 from datetime import date, datetime
+from pytz import timezone
 
 DB_PATH = "/data/users.db"
+
+KIEV_TZ = timezone("Europe/Kyiv")
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -53,7 +56,6 @@ def update_user_settings(user_id, start_time, end_time, reminders):
     conn.commit()
 
 def get_user(user_id):
-    print("[DEBUG] get_user user_id:", user_id, type(user_id))
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
@@ -71,7 +73,7 @@ def add_pushups(user_id, count):
     if not u:
         return False
     today_str = date.today().isoformat()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.now(KIEV_TZ).strftime("%Y-%m-%d %H:%M:%S")
     if u["last_date"] != today_str:
         pushups = 0
         day = u["day"] + 1
@@ -96,7 +98,6 @@ def add_pushups(user_id, count):
     return True
 
 def decrease_pushups(user_id, count):
-    print("[DEBUG] decrease_pushups user_id:", user_id, type(user_id))
     u = get_user(user_id)
     if not u:
         return False
@@ -164,7 +165,6 @@ def get_all_user_ids():
     return [row["user_id"] for row in cur.fetchall()]
 
 def get_top_pushups_today(limit=5):
-    from datetime import date
     conn = get_db()
     cur = conn.cursor()
     today_str = date.today().isoformat()
@@ -174,9 +174,9 @@ def get_top_pushups_today(limit=5):
         FROM users
         WHERE last_date=?
         ORDER BY
-            CASE WHEN pushups_today >= 100 THEN 0 ELSE 1 END,                     -- сначала добившие 100
-            CASE WHEN pushups_today >= 100 THEN completed_time END ASC,           -- среди них — кто раньше
-            pushups_today DESC                                                    -- остальные по количеству
+            CASE WHEN pushups_today >= 100 THEN 0 ELSE 1 END,
+            CASE WHEN pushups_today >= 100 THEN completed_time END ASC,
+            pushups_today DESC
         LIMIT ?
         """,
         (today_str, limit)
