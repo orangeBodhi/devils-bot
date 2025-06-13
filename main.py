@@ -486,44 +486,54 @@ async def decrease_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+
+    # Обработка уменьшения количества отжиманий
     if context.user_data.get("awaiting_decrease"):
         try:
             dec_count = int(text)
         except ValueError:
-            await update.message.reply_text("Будь ласка, вкажи число", reply_markup=get_main_keyboard())
+            await update.message.reply_text(
+                "Будь ласка, вкажи число", reply_markup=get_main_keyboard()
+            )
             return
         user = update.effective_user
-        user_db = get_user(user.id)
-        cur = user_db["pushups_today"]
-        new_val = max(0, cur - dec_count)
-        conn = get_db()
-        cur_db = conn.cursor()
-        cur_db.execute("UPDATE users SET pushups_today=? WHERE user_id=?", (new_val, user.id))
-        conn.commit()
+        new_val = decrease_pushups(user.id, dec_count)
         context.user_data["awaiting_decrease"] = False
         await update.message.reply_text(
             f"Кількість зменшено! Новий прогрес: {emoji_number(new_val)}",
             reply_markup=get_main_keyboard()
         )
         return
+
+    # Быстрое добавление по кнопке
     count = parse_pushup_command(text)
     if count is not None:
         await add_pushups_generic(update, context, count)
         return
+
+    # Запрос на ввод индивидуального количества
     if text == "🎲 Інша кількість":
         await add_custom(update, context)
         return
+
+    # Статус пользователя
     if text == "🏅 Мій статус":
         await status(update, context)
         return
+
+    # Вход в настройки
     if text == f"{SETTINGS} Налаштування":
         await settings_entry(update, context)
         return
+
+    # Обработка индивидуального количества отжиманий
     if context.user_data.get("awaiting_custom"):
         try:
             count = int(text)
         except ValueError:
-            await update.message.reply_text("Будь ласка, вкажи число", reply_markup=get_main_keyboard())
+            await update.message.reply_text(
+                "Будь ласка, вкажи число", reply_markup=get_main_keyboard()
+            )
             return
         await add_pushups_generic(update, context, count)
         context.user_data["awaiting_custom"] = False
