@@ -94,6 +94,22 @@ def add_pushups(user_id, count):
     conn.commit()
     return True
 
+def decrease_pushups(user_id, count):
+    u = get_user(user_id)
+    if not u:
+        return False
+    today_str = date.today().isoformat()
+    cur_pushups = u["pushups_today"] if u["last_date"] == today_str else 0
+    new_pushups = max(0, cur_pushups - count)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET pushups_today=?, last_date=? WHERE user_id=?",
+        (new_pushups, today_str, user_id)
+    )
+    conn.commit()
+    return new_pushups
+
 def get_pushups_today(user_id):
     u = get_user(user_id)
     if not u:
