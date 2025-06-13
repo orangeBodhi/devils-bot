@@ -503,7 +503,7 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
             return
         user = update.effective_user
         logging.info(f"[DEBUG] decrease_pushups вызывается: user_id={user.id}, dec_count={dec_count}")
-        new_val = await decrease_pushups(user.id, dec_count)   # ← вот здесь await
+        new_val = decrease_pushups(user.id, dec_count)
         context.user_data["awaiting_decrease"] = False
         await update.message.reply_text(
             f"Кількість зменшено! Новий прогрес: {emoji_number(new_val)}",
