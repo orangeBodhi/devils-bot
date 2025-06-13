@@ -34,6 +34,7 @@ from db import (
     update_user_settings,
     get_top_pushups_today,
     decrease_pushups,
+    get_db,
 )
 
 ASK_NAME, ASK_START_TIME, ASK_END_TIME, ASK_REMINDERS = range(4)
