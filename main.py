@@ -490,32 +490,7 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
             return
         user = update.effective_user
         logging.info(f"[DEBUG] decrease_pushups вызывается: user_id={user.id}, dec_count={dec_count}")
-        new_val = await decrease_pushups(user.id, dec_count)   # ← ВАЖНО: добавь await
-        context.user_data["awaiting_decrease"] = False
-        await update.message.reply_text(
-            f"Кількість зменшено! Новий прогрес: {emoji_number(new_val)}",
-            reply_markup=get_main_keyboard()
-        )
-        return
-
-async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    logging.info(f"[DEBUG] handle_custom_pushups вызвана. awaiting_decrease={context.user_data.get('awaiting_decrease')}, text={text}")
-
-    # Обработка уменьшения количества отжиманий
-    if context.user_data.get("awaiting_decrease"):
-        logging.info("[DEBUG] Вошли в блок уменьшения отжиманий")
-        try:
-            dec_count = int(text)
-        except ValueError:
-            logging.info("[DEBUG] Введено не число для уменьшения")
-            await update.message.reply_text(
-                "Будь ласка, вкажи число", reply_markup=get_main_keyboard()
-            )
-            return
-        user = update.effective_user
-        logging.info(f"[DEBUG] decrease_pushups вызывается: user_id={user.id}, dec_count={dec_count}")
-        new_val = decrease_pushups(user.id, dec_count)
+        new_val = await decrease_pushups(user.id, dec_count)   # ← вот здесь await
         context.user_data["awaiting_decrease"] = False
         await update.message.reply_text(
             f"Кількість зменшено! Новий прогрес: {emoji_number(new_val)}",
