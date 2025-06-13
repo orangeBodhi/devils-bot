@@ -473,6 +473,19 @@ async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_custom"] = True
     await update.message.reply_text("Вкажи кількість зроблених віджимань (наприклад, 13):", reply_markup=get_main_keyboard())
 
+async def decrease_pushups_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    user_db = get_user(user.id)
+    if not user_db:
+        await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
+        return
+
+    await update.message.reply_text(
+        "На скільки зменшити кількість віджимань? Вкажи число (наприклад, 10):",
+        reply_markup=get_main_keyboard()
+    )
+    context.user_data["awaiting_decrease"] = True
+
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     logging.info(f"[DEBUG] handle_custom_pushups вызвана. awaiting_decrease={context.user_data.get('awaiting_decrease')}, text={text}")
@@ -918,7 +931,7 @@ def main():
     application.add_handler(CommandHandler("lobby", lobby))
     application.add_handler(MessageHandler(filters.Regex(f"^{LEADERBOARD}$"), lobby))
     application.add_handler(CommandHandler("dumpusers", dump_users))
-    application.add_handler(MessageHandler(filters.Regex("^➖ Зменшити кількість$"), decrease_pushups))
+    application.add_handler(MessageHandler(filters.Regex("^➖ Зменшити кількість$"), decrease_pushups_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
         
     logger.info("Bot started!")
