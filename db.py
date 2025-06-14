@@ -104,11 +104,15 @@ def decrease_pushups(user_id, count):
     today_str = date.today().isoformat()
     cur_pushups = u["pushups_today"] if u["last_date"] == today_str else 0
     new_pushups = max(0, cur_pushups - count)
+    completed_time = u["completed_time"]
+    # Если было >=100, а стало <100 — сбросить completed_time
+    if cur_pushups >= 100 and new_pushups < 100:
+        completed_time = None
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "UPDATE users SET pushups_today=?, last_date=? WHERE user_id=?",
-        (new_pushups, today_str, user_id)
+        "UPDATE users SET pushups_today=?, last_date=?, completed_time=? WHERE user_id=?",
+        (new_pushups, today_str, completed_time, user_id)
     )
     conn.commit()
     return new_pushups
