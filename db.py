@@ -22,7 +22,6 @@ def init_db():
             start_time TEXT,
             end_time TEXT,
             reminders INTEGER,
-            day INTEGER DEFAULT 1,
             pushups_today INTEGER DEFAULT 0,
             last_date TEXT,
             fails INTEGER DEFAULT 0,
@@ -40,12 +39,11 @@ def add_user(user_id, name, start_time, end_time, reminders, username=None):
     if cur.fetchone():
         conn.close()
         return
-    # Зарегистрируем сегодняшнюю дату регистрации
     today_str = date.today().isoformat()
     cur.execute(
         """
-        INSERT INTO users (user_id, username, name, start_time, end_time, reminders, day, pushups_today, last_date, fails, completed_time, registered_date)
-        VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, 0, NULL, ?)
+        INSERT INTO users (user_id, username, name, start_time, end_time, reminders, pushups_today, last_date, fails, completed_time, registered_date)
+        VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, NULL, ?)
         """,
         (user_id, username, name, start_time, end_time, reminders, today_str, today_str)
     )
@@ -73,6 +71,7 @@ def get_user(user_id):
 def reset_user(user_id):
     conn = get_db()
     cur = conn.cursor()
+    # Удаляем пользователя полностью, чтобы при повторной регистрации дата регистрации сбросилась
     cur.execute("DELETE FROM users WHERE user_id=?", (user_id,))
     conn.commit()
     conn.close()
@@ -85,12 +84,10 @@ def add_pushups(user_id, count):
     now_str = datetime.now(KIEV_TZ).strftime("%Y-%m-%d %H:%M:%S")
     if u["last_date"] != today_str:
         pushups = 0
-        day = u["day"] + 1
         fails = u["fails"]
         completed_time = None
     else:
         pushups = u["pushups_today"]
-        day = u["day"]
         fails = u["fails"]
         completed_time = u.get("completed_time")
     new_pushups = min(pushups + count, 100)
@@ -100,8 +97,8 @@ def add_pushups(user_id, count):
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "UPDATE users SET pushups_today=?, last_date=?, day=?, fails=?, completed_time=? WHERE user_id=?",
-        (new_pushups, today_str, day, fails, completed_time, user_id)
+        "UPDATE users SET pushups_today=?, last_date=?, fails=?, completed_time=? WHERE user_id=?",
+        (new_pushups, today_str, fails, completed_time, user_id)
     )
     conn.commit()
     conn.close()
@@ -145,8 +142,8 @@ def next_day(user_id):
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "UPDATE users SET day=?, pushups_today=0, last_date=?, fails=?, completed_time=NULL WHERE user_id=?",
-        (u["day"] + 1, today_str, u["fails"], user_id)
+        "UPDATE users SET pushups_today=0, last_date=?, fails=?, completed_time=NULL WHERE user_id=?",
+        (today_str, u["fails"], user_id)
     )
     conn.commit()
     conn.close()
@@ -160,8 +157,8 @@ def fail_day(user_id):
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "UPDATE users SET fails=?, day=?, pushups_today=0, last_date=?, completed_time=NULL WHERE user_id=?",
-        (fails, u["day"] + 1, today_str, user_id)
+        "UPDATE users SET fails=?, pushups_today=0, last_date=?, completed_time=NULL WHERE user_id=?",
+        (fails, today_str, user_id)
     )
     conn.commit()
     conn.close()
@@ -171,9 +168,13 @@ def get_fails(user_id):
     u = get_user(user_id)
     return u["fails"] if u else 0
 
-def get_day(user_id):
-    u = get_user(user_id)
-    return u["day"] if u else 1
+def get_user_current_day(u):
+    """
+    Возвращает текущий день челленджа для пользователя u (dict).
+    """
+    today = date.today()
+    reg_date = datetime.strptime(u["registered_date"], "%Y-%m-%d").date()
+    return (today - reg_date).days + 1
 
 def get_all_user_ids():
     conn = get_db()
