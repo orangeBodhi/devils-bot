@@ -229,13 +229,6 @@ def is_within_today_working_period(start_time, end_time):
     end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
     return start_dt <= now < end_dt
 
-def is_within_today_working_period(start_time, end_time):
-    now = datetime.now(KIEV_TZ)
-    today = now.date()
-    start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
-    end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
-    return start_dt <= now < end_dt
-
 async def send_reminders_loop(application, user_id, chat_id):
     u = get_user(user_id)
     if not u or get_game_over(user_id):
