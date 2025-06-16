@@ -970,6 +970,7 @@ def main():
     application.add_handler(MessageHandler(filters.Regex(f"^{LEADERBOARD}$"), lobby))
     application.add_handler(CommandHandler("dumpusers", dump_users))
     application.add_handler(CommandHandler("showtable", show_table_info))
+    application.add_handler(CommandHandler("migrate_registered", migrate_add_registered_date))
     application.add_handler(MessageHandler(filters.Regex("^➖ Зменшити кількість$"), decrease_pushups_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
         
