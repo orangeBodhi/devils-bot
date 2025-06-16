@@ -94,7 +94,46 @@ def ensure_notify_fail_column():
             print("Column notify_fail added to users!")
         except Exception as e:
             print("Failed to add notify_fail:", e)
+    conn.close()
+
+def ensure_game_over_column():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(users);")
+    cols = [row[1] for row in cur.fetchall()]
+    if "game_over" not in cols:
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN game_over INTEGER DEFAULT 0;")
+            conn.commit()
+            print("Column game_over added to users!")
+        except Exception as e:
+            print("Failed to add game_over:", e)
+    conn.close()
+
 ensure_notify_fail_column()
+# Важно! ensure_game_over_column вызывается только по команде, см. ниже
+
+# --- game_over helpers ---
+def get_game_over(user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT game_over FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    return row["game_over"] if row and "game_over" in row.keys() else 0
+
+def set_game_over(user_id, value=1):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET game_over = ? WHERE user_id = ?", (value, user_id))
+    conn.commit()
+
+# --- команда для ручной миграции game_over ---
+async def migrate_gameover(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("Тільки для адміністратора.")
+        return
+    ensure_game_over_column()
+    await update.message.reply_text("Міграція game_over виконана (стовпець додано, якщо його не було).")
 
 def get_main_keyboard():
     keyboard = [
@@ -190,9 +229,16 @@ def is_within_today_working_period(start_time, end_time):
     end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
     return start_dt <= now < end_dt
 
+def is_within_today_working_period(start_time, end_time):
+    now = datetime.now(KIEV_TZ)
+    today = now.date()
+    start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
+    end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
+    return start_dt <= now < end_dt
+
 async def send_reminders_loop(application, user_id, chat_id):
     u = get_user(user_id)
-    if not u:
+    if not u or get_game_over(user_id):
         return
     skip_day = False
     day_num = get_user_current_day(u)
@@ -201,7 +247,7 @@ async def send_reminders_loop(application, user_id, chat_id):
         skip_day = True
     while True:
         u = get_user(user_id)
-        if not u:
+        if not u or get_game_over(user_id):
             return
         start_time = u["start_time"]
         end_time = u["end_time"]
@@ -229,6 +275,7 @@ async def send_reminders_loop(application, user_id, chat_id):
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode="Markdown"
                 )
+                set_game_over(user_id, 1)
             set_notify_fail(user_id, 0)
 
         if skip_day:
@@ -242,95 +289,107 @@ async def send_reminders_loop(application, user_id, chat_id):
         if now < start_dt:
             await asyncio.sleep((start_dt - now).total_seconds())
         u = get_user(user_id)
-        if u:
-            day_num = get_user_current_day(u)
-            if day_num == 1:
+        if not u or get_game_over(user_id):
+            return
+        day_num = get_user_current_day(u)
+        if day_num == 1:
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=f"{DEVIL} Вітаю в Devil's 100 Challenge, *{u['username'] or u['name'] or 'друг'}*! Сьогодні перший день челленджу, а отже тебі необхідно зробити перші 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
+        else:
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
+
+        # --- Рассылка напоминаний ---
+        times = get_reminder_times(start_time, end_time, reminders_count)
+        now = datetime.now(KIEV_TZ)
+        today = now.date()
+        reminder_datetimes = []
+        for t in times:
+            reminder_dt = KIEV_TZ.localize(datetime.combine(today, t))
+            if reminder_dt > now:
+                reminder_datetimes.append(reminder_dt)
+        for reminder_dt in reminder_datetimes:
+            seconds = (reminder_dt - datetime.now(KIEV_TZ)).total_seconds()
+            if seconds > 0:
+                await asyncio.sleep(seconds)
+            pushups = get_pushups_today(user_id)
+            if pushups >= 100 or get_game_over(user_id):
+                continue
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text="Агов! Ти не забув(ла) про челлендж? Відожмись! 💪",
+                reply_markup=get_main_keyboard()
+            )
+
+        # --- Ждем до конца календарного дня! ---
+        now = datetime.now(KIEV_TZ)
+        tomorrow = now.date() + timedelta(days=1)
+        midnight = KIEV_TZ.localize(datetime.combine(tomorrow, dt_time(0, 0)))
+        seconds_to_midnight = (midnight - now).total_seconds()
+        if seconds_to_midnight > 0:
+            await asyncio.sleep(seconds_to_midnight)
+
+        # --- Итог дня: только после полуночи! ---
+        u = get_user(user_id)
+        if not u or get_game_over(user_id):
+            return
+        user_name = u["username"] or u["name"] or "друг"
+        if u["pushups_today"] >= 100:
+            next_day(user_id)
+            day_completed = get_user_current_day(u)
+            if day_completed >= 90:
                 await application.bot.send_message(
                     chat_id=chat_id,
-                    text=f"{DEVIL} Вітаю в Devil's 100 Challenge, *{u['username'] or u['name'] or 'друг'}*! Сьогодні перший день челленджу, а отже тебі необхідно зробити перші 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+                    text=(
+                        "🎉 Вітаю з перемогою в Devil's 100 Challenge! 💪🔥\n"
+                        "Ти довів(ла), що сила — не лише в м'язах, а й у характері.\n"
+                        "Кожен ранок, кожен підхід, кожна крапля поту — це крок до перемоги над собою.\n"
+                        "Ти — натхнення для всіх, хто прагне до дісципліни та самовдосконалення! 🌟\n"
+                        "👏 Браво, чемпіоне! Нехай цей успіх стане лише початком нових звершень! 🚀\n"
+                        "🏆 #90ДнівСили #ЗалізнаВоля👊"
+                    ),
                     parse_mode="Markdown",
                     reply_markup=get_main_keyboard()
                 )
             else:
                 await application.bot.send_message(
                     chat_id=chat_id,
-                    text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+                    text=f"Вітаю, *{user_name}*, ти молодець! Сьогоднішня сотка зроблена, побачимося завтра! {STRONG}",
                     parse_mode="Markdown",
                     reply_markup=get_main_keyboard()
                 )
-
-            # --- Рассылка напоминаний ---
-            times = get_reminder_times(start_time, end_time, reminders_count)
-            now = datetime.now(KIEV_TZ)
-            today = now.date()
-            reminder_datetimes = []
-            for t in times:
-                reminder_dt = KIEV_TZ.localize(datetime.combine(today, t))
-                if reminder_dt > now:
-                    reminder_datetimes.append(reminder_dt)
-            for reminder_dt in reminder_datetimes:
-                seconds = (reminder_dt - datetime.now(KIEV_TZ)).total_seconds()
-                if seconds > 0:
-                    await asyncio.sleep(seconds)
-                pushups = get_pushups_today(user_id)
-                if pushups >= 100:
-                    continue
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text="Агов! Ти не забув(ла) про челлендж? Відожмись! 💪",
-                    reply_markup=get_main_keyboard()
-                )
-
-            # --- Ждем до конца календарного дня! ---
-            now = datetime.now(KIEV_TZ)
-            tomorrow = now.date() + timedelta(days=1)
-            midnight = KIEV_TZ.localize(datetime.combine(tomorrow, dt_time(0, 0)))
-            seconds_to_midnight = (midnight - now).total_seconds()
-            if seconds_to_midnight > 0:
-                await asyncio.sleep(seconds_to_midnight)
-
-            # --- Итог дня: только после полуночи! ---
-            u = get_user(user_id)
-            if u:
-                user_name = u["username"] or u["name"] or "друг"
-                if u["pushups_today"] >= 100:
-                    next_day(user_id)
-                    day_completed = get_user_current_day(u)
-                    if day_completed >= 90:
-                        await application.bot.send_message(
-                            chat_id=chat_id,
-                            text=(
-                                "🎉 Вітаю з перемогою в Devil's 100 Challenge! 💪🔥\n"
-                                "Ти довів(ла), що сила — не лише в м'язах, а й у характері.\n"
-                                "Кожен ранок, кожен підхід, кожна крапля поту — це крок до перемоги над собою.\n"
-                                "Ти — натхнення для всіх, хто прагне до дісципліни та самовдосконалення! 🌟\n"
-                                "👏 Браво, чемпіоне! Нехай цей успіх стане лише початком нових звершень! 🚀\n"
-                                "🏆 #90ДнівСили #ЗалізнаВоля👊"
-                            ),
-                            parse_mode="Markdown",
-                            reply_markup=get_main_keyboard()
-                        )
-                    else:
-                        await application.bot.send_message(
-                            chat_id=chat_id,
-                            text=f"Вітаю, *{user_name}*, ти молодець! Сьогоднішня сотка зроблена, побачимося завтра! {STRONG}",
-                            parse_mode="Markdown",
-                            reply_markup=get_main_keyboard()
-                        )
-                else:
-                    fails = fail_day(user_id)
-                    set_notify_fail(user_id, 1)
+        else:
+            fails = fail_day(user_id)
+            set_notify_fail(user_id, 1)
+            if fails >= 3:
+                set_game_over(user_id, 1)
 
 def start_reminders(application, user_id, chat_id):
     old_task = reminder_tasks.get(user_id)
     if old_task:
         old_task.cancel()
+    if get_game_over(user_id):
+        return
     task = asyncio.create_task(send_reminders_loop(application, user_id, chat_id))
     reminder_tasks[user_id] = task
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     user_db = get_user(user.id)
+    if user_db and get_game_over(user.id):
+        await update.message.reply_text(
+            "Твій попередній челлендж завершено! Напиши /reset, щоб розпочати все з нуля.",
+            reply_markup=get_main_keyboard()
+        )
+        return ConversationHandler.END
     if user_db:
         await update.message.reply_text(
             "Ти вже зареєстрований(на)! Напиши /reset, щоб розпочати все з нуля.",
@@ -421,6 +480,7 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     reset_user(user.id)
+    set_game_over(user.id, 0)
     old_task = reminder_tasks.get(user.id)
     if old_task:
         old_task.cancel()
@@ -441,6 +501,11 @@ def parse_pushup_command(text):
 
 async def add_pushups_generic(update, context, count):
     user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text(
+            "Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard()
+        )
+        return
     user_db = get_user(user.id)
     if not user_db:
         await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
@@ -476,11 +541,21 @@ async def add_pushups_generic(update, context, count):
         )
 
 async def add_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if get_game_over(update.effective_user.id):
+        await update.message.reply_text(
+            "Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard()
+        )
+        return
     context.user_data["awaiting_custom"] = True
     await update.message.reply_text("Вкажи кількість зроблених віджимань (наприклад, 13):", reply_markup=get_main_keyboard())
 
 async def decrease_pushups_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text(
+            "Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard()
+        )
+        return
     user_db = get_user(user.id)
     if not user_db:
         await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
@@ -494,6 +569,13 @@ async def decrease_pushups_handler(update: Update, context: ContextTypes.DEFAULT
 
 async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+    user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text(
+            "Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard()
+        )
+        return
+
     logging.info(f"[DEBUG] handle_custom_pushups вызвана. awaiting_decrease={context.user_data.get('awaiting_decrease')}, text={text}")
 
     # Обработка уменьшения количества отжиманий
@@ -507,8 +589,6 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
                 "Будь ласка, вкажи число", reply_markup=get_main_keyboard()
             )
             return
-        user = update.effective_user
-        logging.info(f"[DEBUG] decrease_pushups вызывается: user_id={user.id}, dec_count={dec_count}")
         new_val = decrease_pushups(user.id, dec_count)
         context.user_data["awaiting_decrease"] = False
         await update.message.reply_text(
@@ -524,7 +604,7 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     if text == "🎲 Інша кількість":
-        logging.info("[DEBUG] Индивидуальное количество отжиманий")
+        logging.info("[DEBUG] Индивидуальное количество отжимань")
         await add_custom(update, context)
         return
 
@@ -557,6 +637,10 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not u:
         await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
         return
+    if get_game_over(user.id):
+        await update.message.reply_text("Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard())
+        return
+
     day = get_user_current_day(u)
     fails = u["fails"]
     pushups = u["pushups_today"]
@@ -571,7 +655,12 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, reply_markup=get_main_keyboard())
 
 async def lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    top = get_top_pushups_today(5)
+    user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text("Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard())
+        return
+    # Показываем только тех, у кого челлендж не завершён
+    top = [u for u in get_top_pushups_today(5) if not get_game_over(u["user_id"])]
     if not top:
         await update.message.reply_text("Поки ще ніхто не віджимався сьогодні! Будь першим! 💪", reply_markup=get_main_keyboard())
         return
@@ -579,7 +668,7 @@ async def lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for idx, user in enumerate(top, 1):
         name = user["username"] or user["name"] or "Безіменний"
         count = user["pushups_today"]
-        if count >= 100 and user["completed_time"]:
+        if count >= 100 and user.get("completed_time"):
             time_str = user["completed_time"][11:16]
             msg += f"{idx}. {name} — {count} віджимань (фініш о {time_str})\n"
         else:
@@ -603,6 +692,7 @@ async def check_end_of_day(user_id, update):
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode="Markdown"
             )
+            set_game_over(user_id, 1)
 
 async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -627,7 +717,7 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def on_startup(application: Application):
     for user_id in get_all_user_ids():
         user = get_user(user_id)
-        if user:
+        if user and not get_game_over(user_id):
             chat_id = user_id
             start_reminders(application, user_id, chat_id)
 
@@ -652,6 +742,9 @@ async def cancel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def settings_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text("Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
     u = get_user(user.id)
     start_time = u["start_time"] if u else "не задано"
     await update.message.reply_text(
@@ -663,6 +756,9 @@ async def settings_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def settings_ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = update.message.text.strip()
     user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text("Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
     u = get_user(user.id)
     end_time = u["end_time"] if u else "не задано"
 
@@ -688,6 +784,10 @@ async def settings_ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     time_text = update.message.text.strip()
+    user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text("Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
     if time_text == BACK:
         return await cancel_settings(update, context)
     if not is_valid_time(time_text):
@@ -714,6 +814,9 @@ async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYP
 async def settings_ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = update.message.text.strip()
     user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text("Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
     u = get_user(user.id)
     reminders = u["reminders"] if u else "не задано"
 
@@ -739,6 +842,10 @@ async def settings_ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def settings_input_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     time_text = update.message.text.strip()
+    user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text("Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
     if time_text == BACK:
         return await cancel_settings(update, context)
     if not is_valid_time(time_text):
@@ -765,6 +872,10 @@ async def settings_input_end(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def settings_ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = update.message.text.strip()
+    user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text("Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
     if answer == BACK:
         return await cancel_settings(update, context)
     if answer == "✅ Так":
@@ -783,6 +894,10 @@ async def settings_ask_reminders(update: Update, context: ContextTypes.DEFAULT_T
 
 async def settings_input_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+    user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text("Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
     if text == BACK:
         return await cancel_settings(update, context)
     try:
@@ -804,6 +919,9 @@ async def settings_input_reminders(update: Update, context: ContextTypes.DEFAULT
 
 async def settings_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if get_game_over(user.id):
+        await update.message.reply_text("Твій челлендж завершено! Напиши /reset щоб почати знову.", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
     user_db = get_user(user.id)
     if not user_db:
         await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
@@ -885,7 +1003,8 @@ async def dump_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"ID: {row['user_id']}, Name: {row['name']}, Username: {row['username']}, "
             f"Pushups: {row['pushups_today']}, Day: {day}, "
             f"Fails: {row['fails']}, Completed: {row['completed_time']}, "
-            f"LastDate: {row['last_date']}, Registered: {row['registered_date']}\n"
+            f"LastDate: {row['last_date']}, Registered: {row['registered_date']}, "
+            f"GameOver: {row['game_over'] if 'game_over' in row.keys() else 'N/A'}\n"
         )
     for i in range(0, len(msg), 4000):
         await update.message.reply_text(msg[i:i+4000])
@@ -948,6 +1067,7 @@ def main():
     application.add_handler(MessageHandler(filters.Regex(f"^{LEADERBOARD}$"), lobby))
     application.add_handler(CommandHandler("dumpusers", dump_users))
     application.add_handler(CommandHandler("showtable", show_table_info))
+    application.add_handler(CommandHandler("migrate_gameover", migrate_gameover))  # Миграция game_over
     application.add_handler(MessageHandler(filters.Regex("^➖ Зменшити кількість$"), decrease_pushups_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
 
