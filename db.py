@@ -27,9 +27,33 @@ def init_db():
             last_date TEXT,
             fails INTEGER DEFAULT 0,
             completed_time TEXT
+            -- registered_date будет добавлено миграцией!
         )
     """)
     conn.commit()
+
+# --- МИГРАЦИОННЫЕ ФУНКЦИИ ---
+
+def ensure_registered_date_column():
+    conn = get_db()
+    cur = conn.cursor()
+    # Проверяем, есть ли уже столбец
+    cur.execute("PRAGMA table_info(users);")
+    columns = [row[1] for row in cur.fetchall()]
+    if "registered_date" not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN registered_date TEXT;")
+        conn.commit()
+
+def fill_registered_date_for_all_users(target_date="2025-06-10"):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id, registered_date FROM users;")
+    for user_id, registered_date in cur.fetchall():
+        if not registered_date:
+            cur.execute("UPDATE users SET registered_date=? WHERE user_id=?", (target_date, user_id))
+    conn.commit()
+
+# --- ДАЛЬШЕ ВЕСЬ ТВОЙ СТАРЫЙ КОД ---
 
 def add_user(user_id, name, start_time, end_time, reminders, username=None):
     conn = get_db()
@@ -37,12 +61,13 @@ def add_user(user_id, name, start_time, end_time, reminders, username=None):
     cur.execute("SELECT user_id FROM users WHERE user_id=?", (user_id,))
     if cur.fetchone():
         return
+    # Теперь добавляем registered_date
     cur.execute(
         """
-        INSERT INTO users (user_id, username, name, start_time, end_time, reminders, day, pushups_today, last_date, fails, completed_time)
-        VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, 0, NULL)
+        INSERT INTO users (user_id, username, name, start_time, end_time, reminders, day, pushups_today, last_date, fails, completed_time, registered_date)
+        VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, 0, NULL, ?)
         """,
-        (user_id, username, name, start_time, end_time, reminders, date.today().isoformat())
+        (user_id, username, name, start_time, end_time, reminders, date.today().isoformat(), "2025-06-10")
     )
     conn.commit()
 
