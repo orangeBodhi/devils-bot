@@ -633,7 +633,7 @@ async def lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for idx, user in enumerate(top, 1):
         name = user["username"] or user["name"] or "Безіменний"
         count = user["pushups_today"]
-        if count >= 100 and user.get("completed_time"):
+        if count >= 100 and user["completed_time"]:
             time_str = user["completed_time"][11:16]
             msg += f"{idx}. {name} — {count} віджимань (фініш о {time_str})\n"
         else:
