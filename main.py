@@ -889,6 +889,20 @@ async def dump_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i in range(0, len(msg), 4000):
         await update.message.reply_text(msg[i:i+4000])
 
+async def show_table_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("Тільки для адміністратора.")
+        return
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(users);")
+    rows = cur.fetchall()
+    msg = ""
+    for row in rows:
+        # row[1] — имя столбца, row[2] — тип, row[3] — NOT NULL, row[4] — значение по-умолчанию
+        msg += f"{row[1]} ({row[2]}), NOT NULL: {row[3]}, DEFAULT: {row[4]}\n"
+    await update.message.reply_text(msg or "Нет информации о структуре.")
+
 def main():
     application = Application.builder().token(TOKEN).build()
 
@@ -933,6 +947,7 @@ def main():
     application.add_handler(CommandHandler("lobby", lobby))
     application.add_handler(MessageHandler(filters.Regex(f"^{LEADERBOARD}$"), lobby))
     application.add_handler(CommandHandler("dumpusers", dump_users))
+    application.add_handler(CommandHandler("showtable", show_table_info))
     application.add_handler(MessageHandler(filters.Regex("^➖ Зменшити кількість$"), decrease_pushups_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
         
