@@ -35,6 +35,8 @@ from db import (
     decrease_pushups,
     get_db,
     get_user_current_day,
+    get_notify_fail,
+    set_notify_fail,
 )
 
 ASK_NAME, ASK_START_TIME, ASK_END_TIME, ASK_REMINDERS = range(4)
@@ -116,6 +118,7 @@ def get_back_keyboard():
         [KeyboardButton(BACK)]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
 def get_settings_only_keyboard():
     keyboard = [
         [KeyboardButton(f"{SETTINGS} Налаштування")]
@@ -194,15 +197,6 @@ async def send_reminders_loop(application, user_id, chat_id):
     skip_day = False
     day_num = get_user_current_day(u)
 
-    # Новый механизм для утреннего уведомления о фейле
-    # Добавим специальное поле в БД? Для простоты — можно использовать вспомогательный флаг в user-объекте, например "notify_fail"
-    # Но если поля нет — используем временный in-memory dict (workaround для SQLite), либо дорабатываем БД.
-
-    # Для примера — используем in-memory dict (не идеальный способ, но для одного процесса сойдет)
-    global fail_notify_flags
-    if 'fail_notify_flags' not in globals():
-        fail_notify_flags = {}
-
     if day_num == 1 and not is_within_today_working_period(u["start_time"], u["end_time"]):
         skip_day = True
     while True:
@@ -218,8 +212,7 @@ async def send_reminders_loop(application, user_id, chat_id):
         end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
 
         # ====== УТРО: Проверить, надо ли уведомить о фейле ======
-        # Если стоит флаг "notify_fail", отправляем сообщение и сбрасываем флаг
-        if fail_notify_flags.get(user_id):
+        if get_notify_fail(user_id):
             user_name = u["username"] or u["name"] or "друг"
             fails = u["fails"]
             if fails < 3:
@@ -236,7 +229,7 @@ async def send_reminders_loop(application, user_id, chat_id):
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode="Markdown"
                 )
-            fail_notify_flags[user_id] = False
+            set_notify_fail(user_id, 0)
 
         if skip_day:
             if now >= end_dt:
@@ -325,11 +318,8 @@ async def send_reminders_loop(application, user_id, chat_id):
                             reply_markup=get_main_keyboard()
                         )
                 else:
-                    # Засчитываем фейл, но не отправляем сообщение ночью, а ставим флаг на утро
                     fails = fail_day(user_id)
-                    fail_notify_flags[user_id] = True
-                    # если хочешь, можешь логировать:
-                    # logger.info(f"User {user_id} failed the day, will notify in the morning.")
+                    set_notify_fail(user_id, 1)
 
 def start_reminders(application, user_id, chat_id):
     old_task = reminder_tasks.get(user_id)
@@ -589,9 +579,7 @@ async def lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for idx, user in enumerate(top, 1):
         name = user["username"] or user["name"] or "Безіменний"
         count = user["pushups_today"]
-        # Показываем время финиша, если чел сделал 100+
         if count >= 100 and user["completed_time"]:
-            # Только часы и минуты (например, 09:15)
             time_str = user["completed_time"][11:16]
             msg += f"{idx}. {name} — {count} віджимань (фініш о {time_str})\n"
         else:
@@ -880,7 +868,6 @@ async def settestreminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def dump_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Только для админа!
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Тільки для адміністратора.")
         return
@@ -900,7 +887,6 @@ async def dump_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Fails: {row['fails']}, Completed: {row['completed_time']}, "
             f"LastDate: {row['last_date']}, Registered: {row['registered_date']}\n"
         )
-    # Ограничим максимум до 4000 символов для Telegram
     for i in range(0, len(msg), 4000):
         await update.message.reply_text(msg[i:i+4000])
 
@@ -914,7 +900,6 @@ async def show_table_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rows = cur.fetchall()
     msg = ""
     for row in rows:
-        # row[1] — имя столбца, row[2] — тип, row[3] — NOT NULL, row[4] — значение по-умолчанию
         msg += f"{row[1]} ({row[2]}), NOT NULL: {row[3]}, DEFAULT: {row[4]}\n"
     await update.message.reply_text(msg or "Нет информации о структуре.")
 
@@ -965,7 +950,7 @@ def main():
     application.add_handler(CommandHandler("showtable", show_table_info))
     application.add_handler(MessageHandler(filters.Regex("^➖ Зменшити кількість$"), decrease_pushups_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
-        
+
     logger.info("Bot started!")
     application.post_init = on_startup
     application.run_polling()
