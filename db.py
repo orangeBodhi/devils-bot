@@ -195,6 +195,13 @@ def get_all_user_ids():
     conn.close()
     return ids
 
+def delete_users_with_3_fails():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM users WHERE fails >= 3")
+    conn.commit()
+    conn.close()
+
 def get_top_pushups_today(limit=5):
     conn = get_db()
     cur = conn.cursor()
