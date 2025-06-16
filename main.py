@@ -80,6 +80,20 @@ reminder_tasks = {}
 
 KIEV_TZ = timezone("Europe/Kyiv")
 
+def ensure_notify_fail_column():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(users);")
+    cols = [row[1] for row in cur.fetchall()]
+    if "notify_fail" not in cols:
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN notify_fail INTEGER DEFAULT 0;")
+            conn.commit()
+            print("Column notify_fail added to users!")
+        except Exception as e:
+            print("Failed to add notify_fail:", e)
+ensure_notify_fail_column()
+
 def get_main_keyboard():
     keyboard = [
         [KeyboardButton("🎯 +10 віджимань"), KeyboardButton("🎯 +15 віджимань")],
@@ -179,6 +193,16 @@ async def send_reminders_loop(application, user_id, chat_id):
         return
     skip_day = False
     day_num = get_user_current_day(u)
+
+    # Новый механизм для утреннего уведомления о фейле
+    # Добавим специальное поле в БД? Для простоты — можно использовать вспомогательный флаг в user-объекте, например "notify_fail"
+    # Но если поля нет — используем временный in-memory dict (workaround для SQLite), либо дорабатываем БД.
+
+    # Для примера — используем in-memory dict (не идеальный способ, но для одного процесса сойдет)
+    global fail_notify_flags
+    if 'fail_notify_flags' not in globals():
+        fail_notify_flags = {}
+
     if day_num == 1 and not is_within_today_working_period(u["start_time"], u["end_time"]):
         skip_day = True
     while True:
@@ -192,6 +216,28 @@ async def send_reminders_loop(application, user_id, chat_id):
         today = now.date()
         start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
         end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
+
+        # ====== УТРО: Проверить, надо ли уведомить о фейле ======
+        # Если стоит флаг "notify_fail", отправляем сообщение и сбрасываем флаг
+        if fail_notify_flags.get(user_id):
+            user_name = u["username"] or u["name"] or "друг"
+            fails = u["fails"]
+            if fails < 3:
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"Пу-пу-пу… *{user_name}*, вчора ти не осилив(ла) сотку. Нажаль, це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
+                    reply_markup=get_main_keyboard(),
+                    parse_mode="Markdown"
+                )
+            else:
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"Нажаль ти зафейлив(ла) третій раз! {SKULL}\nДля тебе, *{user_name}*, Devil's 100 Challenge закінчено… цього разу!\nДля перезапуску напиши /reset",
+                    reply_markup=ReplyKeyboardRemove(),
+                    parse_mode="Markdown"
+                )
+            fail_notify_flags[user_id] = False
+
         if skip_day:
             if now >= end_dt:
                 next_start_dt = KIEV_TZ.localize(datetime.combine(today + timedelta(days=1), datetime.strptime(start_time, "%H:%M").time()))
@@ -242,12 +288,15 @@ async def send_reminders_loop(application, user_id, chat_id):
                     reply_markup=get_main_keyboard()
                 )
 
-            # --- Ждем до конца дня ---
-            seconds_to_end = (end_dt - datetime.now(KIEV_TZ)).total_seconds()
-            if seconds_to_end > 0:
-                await asyncio.sleep(seconds_to_end)
+            # --- Ждем до конца календарного дня! ---
+            now = datetime.now(KIEV_TZ)
+            tomorrow = now.date() + timedelta(days=1)
+            midnight = KIEV_TZ.localize(datetime.combine(tomorrow, dt_time(0, 0)))
+            seconds_to_midnight = (midnight - now).total_seconds()
+            if seconds_to_midnight > 0:
+                await asyncio.sleep(seconds_to_midnight)
 
-            # --- Итог дня ---
+            # --- Итог дня: только после полуночи! ---
             u = get_user(user_id)
             if u:
                 user_name = u["username"] or u["name"] or "друг"
@@ -276,22 +325,11 @@ async def send_reminders_loop(application, user_id, chat_id):
                             reply_markup=get_main_keyboard()
                         )
                 else:
+                    # Засчитываем фейл, но не отправляем сообщение ночью, а ставим флаг на утро
                     fails = fail_day(user_id)
-                    if fails < 3:
-                        await application.bot.send_message(
-                            chat_id=chat_id,
-                            text=f"Пу-пу-пу… *{user_name}*, сьогодні ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
-                            reply_markup=get_main_keyboard()
-                        )
-                    else:
-                        await application.bot.send_message(
-                            chat_id=chat_id,
-                            text=f"Нажаль ти зафейлив(ла) третій раз! {SKULL}\nДля тебе, *{user_name}*, Devil's 100 Challenge закінчено… цього разу!\nДля перезапуску напиши /reset",
-                            reply_markup=ReplyKeyboardRemove(),
-                            parse_mode="Markdown"
-                        )
-            tomorrow = KIEV_TZ.localize(datetime.combine(now.date() + timedelta(days=1), dt_time(0,0)))
-            await asyncio.sleep((tomorrow - datetime.now(KIEV_TZ)).total_seconds())
+                    fail_notify_flags[user_id] = True
+                    # если хочешь, можешь логировать:
+                    # logger.info(f"User {user_id} failed the day, will notify in the morning.")
 
 def start_reminders(application, user_id, chat_id):
     old_task = reminder_tasks.get(user_id)
@@ -567,7 +605,7 @@ async def check_end_of_day(user_id, update):
         fails = fail_day(user_id)
         if fails < 3:
             await update.message.reply_text(
-                f"Пу-пу-пу… *{user_name}*, сьогодні ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
+                f"Пу-пу-пу… *{user_name}*, вчора ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
                 parse_mode="Markdown",
                 reply_markup=get_main_keyboard()
             )
