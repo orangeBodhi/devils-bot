@@ -541,15 +541,11 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return
 
-    logging.info(f"[DEBUG] handle_custom_pushups вызвана. awaiting_decrease={context.user_data.get('awaiting_decrease')}, text={text}")
-
     # Обработка уменьшения количества отжиманий
     if context.user_data.get("awaiting_decrease"):
-        logging.info("[DEBUG] Вошли в блок уменьшения отжиманий")
         try:
             dec_count = int(text)
         except ValueError:
-            logging.info("[DEBUG] Введено не число для уменьшения")
             await update.message.reply_text(
                 "Будь ласка, вкажи число", reply_markup=get_main_keyboard()
             )
@@ -564,38 +560,32 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
 
     count = parse_pushup_command(text)
     if count is not None:
-        logging.info(f"[DEBUG] Быстрое добавление: {count}")
         await add_pushups_generic(update, context, count)
         return
 
     if text == "🎲 Інша кількість":
-        logging.info("[DEBUG] Индивидуальное количество отжимань")
         await add_custom(update, context)
         return
 
     if text == "🏅 Мій статус":
-        logging.info("[DEBUG] Запрос статуса")
         await status(update, context)
         return
 
     if text == f"{SETTINGS} Налаштування":
-        logging.info("[DEBUG] Вход в настройки")
         await settings_entry(update, context)
         return
 
     if context.user_data.get("awaiting_custom"):
-        logging.info("[DEBUG] awaiting_custom True")
         try:
             count = int(text)
         except ValueError:
-            logging.info("[DEBUG] awaiting_custom — введено не число")
             await update.message.reply_text(
                 "Будь ласка, вкажи число", reply_markup=get_main_keyboard()
             )
             return
         await add_pushups_generic(update, context, count)
         context.user_data["awaiting_custom"] = False
-
+        
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     u = get_user(user.id)
@@ -988,7 +978,6 @@ async def show_table_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg or "Нет информации о структуре.")
 
 async def purge_failed_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("DEBUG: purge_failed_users вызвана")
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Тільки для адміністратора.")
         return
