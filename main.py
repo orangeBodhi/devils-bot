@@ -903,6 +903,28 @@ async def show_table_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"{row[1]} ({row[2]}), NOT NULL: {row[3]}, DEFAULT: {row[4]}\n"
     await update.message.reply_text(msg or "Нет информации о структуре.")
 
+async def migrate_add_registered_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("Тільки для адміністратора.")
+        return
+    conn = get_db()
+    cur = conn.cursor()
+    # Добавим столбец, если его нет
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN registered_date TEXT")
+        conn.commit()
+        await update.message.reply_text("Поле registered_date добавлено.")
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка или поле уже есть: {e}")
+        return
+    now = "2025-06-10"
+    try:
+        cur.execute("UPDATE users SET registered_date = ?", (now,))
+        conn.commit()
+        await update.message.reply_text("registered_date заполнено для всех пользователей.")
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка при заполнении: {e}")
+
 def main():
     application = Application.builder().token(TOKEN).build()
 
