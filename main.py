@@ -988,6 +988,7 @@ async def show_table_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg or "Нет информации о структуре.")
 
 async def purge_failed_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("DEBUG: purge_failed_users вызвана")
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Тільки для адміністратора.")
         return
