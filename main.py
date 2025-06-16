@@ -918,19 +918,6 @@ async def show_table_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"{row[1]} ({row[2]}), NOT NULL: {row[3]}, DEFAULT: {row[4]}\n"
     await update.message.reply_text(msg or "Нет информации о структуре.")
 
-async def migrate_notify_fail(update, context):
-    if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("Тільки для адміністратора.")
-        return
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("ALTER TABLE users ADD COLUMN notify_fail INTEGER DEFAULT 0;")
-        conn.commit()
-        await update.message.reply_text("Колонка notify_fail успешно добавлена!")
-    except Exception as e:
-        await update.message.reply_text(f"Ошибка миграции: {e}")
-
 def main():
     application = Application.builder().token(TOKEN).build()
 
@@ -976,7 +963,6 @@ def main():
     application.add_handler(MessageHandler(filters.Regex(f"^{LEADERBOARD}$"), lobby))
     application.add_handler(CommandHandler("dumpusers", dump_users))
     application.add_handler(CommandHandler("showtable", show_table_info))
-    application.add_handler(CommandHandler("migratenotify", migrate_notify_fail))
     application.add_handler(MessageHandler(filters.Regex("^➖ Зменшити кількість$"), decrease_pushups_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
         
