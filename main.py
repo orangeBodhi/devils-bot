@@ -883,7 +883,7 @@ async def dump_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"ID: {row['user_id']}, Name: {row['name']}, Username: {row['username']}, "
             f"Pushups: {row['pushups_today']}, Day: {row['day']}, "
             f"Fails: {row['fails']}, Completed: {row['completed_time']}, "
-            f"LastDate: {row['last_date']}\n"
+            f"LastDate: {row['last_date']}, Registered: {row['registered_date']}\n"
         )
     # Ограничим максимум до 4000 символов для Telegram
     for i in range(0, len(msg), 4000):
