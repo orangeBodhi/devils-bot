@@ -26,9 +26,19 @@ def init_db():
             last_date TEXT,
             fails INTEGER DEFAULT 0,
             completed_time TEXT,
-            registered_date TEXT
+            registered_date TEXT,
+            notify_fail INTEGER DEFAULT 0
         )
     """)
+    # Миграция для старых БД, если notify_fail нет
+    cur.execute("PRAGMA table_info(users);")
+    cols = [row[1] for row in cur.fetchall()]
+    if "notify_fail" not in cols:
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN notify_fail INTEGER DEFAULT 0;")
+            conn.commit()
+        except Exception as e:
+            print("Failed to add notify_fail:", e)
     conn.commit()
     conn.close()
 
@@ -42,8 +52,8 @@ def add_user(user_id, name, start_time, end_time, reminders, username=None):
     today_str = date.today().isoformat()
     cur.execute(
         """
-        INSERT INTO users (user_id, username, name, start_time, end_time, reminders, pushups_today, last_date, fails, completed_time, registered_date)
-        VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, NULL, ?)
+        INSERT INTO users (user_id, username, name, start_time, end_time, reminders, pushups_today, last_date, fails, completed_time, registered_date, notify_fail)
+        VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, NULL, ?, 0)
         """,
         (user_id, username, name, start_time, end_time, reminders, today_str, today_str)
     )
@@ -203,3 +213,20 @@ def get_top_pushups_today(limit=5):
     rows = cur.fetchall()
     conn.close()
     return rows
+
+# ---- Работа с notify_fail ----
+
+def get_notify_fail(user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT notify_fail FROM users WHERE user_id=?", (user_id,))
+    row = cur.fetchone()
+    conn.close()
+    return row["notify_fail"] if row else 0
+
+def set_notify_fail(user_id, value):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET notify_fail=? WHERE user_id=?", (value, user_id))
+    conn.commit()
+    conn.close()
