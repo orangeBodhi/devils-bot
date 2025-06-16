@@ -82,37 +82,6 @@ reminder_tasks = {}
 
 KIEV_TZ = timezone("Europe/Kyiv")
 
-def ensure_notify_fail_column():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("PRAGMA table_info(users);")
-    cols = [row[1] for row in cur.fetchall()]
-    if "notify_fail" not in cols:
-        try:
-            cur.execute("ALTER TABLE users ADD COLUMN notify_fail INTEGER DEFAULT 0;")
-            conn.commit()
-            print("Column notify_fail added to users!")
-        except Exception as e:
-            print("Failed to add notify_fail:", e)
-    conn.close()
-
-def ensure_game_over_column():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("PRAGMA table_info(users);")
-    cols = [row[1] for row in cur.fetchall()]
-    if "game_over" not in cols:
-        try:
-            cur.execute("ALTER TABLE users ADD COLUMN game_over INTEGER DEFAULT 0;")
-            conn.commit()
-            print("Column game_over added to users!")
-        except Exception as e:
-            print("Failed to add game_over:", e)
-    conn.close()
-
-ensure_notify_fail_column()
-# Важно! ensure_game_over_column вызывается только по команде, см. ниже
-
 # --- game_over helpers ---
 def get_game_over(user_id):
     conn = get_db()
@@ -271,28 +240,37 @@ async def send_reminders_loop(application, user_id, chat_id):
                 await asyncio.sleep((start_dt - now).total_seconds())
             skip_day = False
             continue
+
+        # --- Ожидание до старта дня пользователя ---
+        send_greeting = False
         if now < start_dt:
             await asyncio.sleep((start_dt - now).total_seconds())
-        # <<< ВСТАВЬ ПРИВЕТСТВИЕ ЗДЕСЬ >>>
+            send_greeting = True
+        else:
+            # Если бот стартует после start_time, то приветствие шлём только если прошло не больше часа после start_time
+            if (now - start_dt).total_seconds() < 30 * 60:
+                send_greeting = True
+
+        # --- Приветствие только утром и только если бот не опоздал! ---
         u = get_user(user_id)
         if not u or get_game_over(user_id):
             return
         day_num = get_user_current_day(u)
-        # Приветствие только в это утро (один раз в сутки)
-        if day_num == 1:
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=f"{DEVIL} Вітаю в Devil's 100 Challenge, *{u['username'] or u['name'] or 'друг'}*! Сьогодні перший день челленджу, а отже тобі необхідно зробити перші 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard()
-            )
-        else:
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard()
-            )
+        if send_greeting:
+            if day_num == 1:
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"{DEVIL} Вітаю в Devil's 100 Challenge, *{u['username'] or u['name'] or 'друг'}*! Сьогодні перший день челленджу, а отже тобі необхідно зробити перші 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_keyboard()
+                )
+            else:
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_keyboard()
+                )
 
         # --- Рассылка напоминаний ---
         times = get_reminder_times(start_time, end_time, reminders_count)
