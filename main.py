@@ -285,20 +285,20 @@ async def send_reminders_loop(application, user_id, chat_id):
         if not u or get_game_over(user_id):
             return
         day_num = get_user_current_day(u)
-        if day_num == 1:
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=f"{DEVIL} Вітаю в Devil's 100 Challenge, *{u['username'] or u['name'] or 'друг'}*! Сьогодні перший день челленджу, а отже тебі необхідно зробити перші 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard()
-            )
-        else:
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard()
-            )
+#        if day_num == 1:
+#           await application.bot.send_message(
+#                chat_id=chat_id,
+#               text=f"{DEVIL} Вітаю в Devil's 100 Challenge, *{u['username'] or u['name'] or 'друг'}*! Сьогодні перший день челленджу, а отже тебі необхідно зробити перші 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+#                parse_mode="Markdown",
+#               reply_markup=get_main_keyboard()
+#            )
+#        else:
+#            await application.bot.send_message(
+#                chat_id=chat_id,
+#                text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+#                parse_mode="Markdown",
+#                reply_markup=get_main_keyboard()
+#            )
 
         # --- Рассылка напоминаний ---
         times = get_reminder_times(start_time, end_time, reminders_count)
