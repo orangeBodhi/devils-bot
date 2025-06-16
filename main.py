@@ -29,14 +29,12 @@ from db import (
     next_day,
     fail_day,
     get_fails,
-    get_day,
     get_all_user_ids,
     update_user_settings,
     get_top_pushups_today,
     decrease_pushups,
     get_db,
-    ensure_registered_date_column,
-    fill_registered_date_for_all_users, 
+    get_user_current_day,
 )
 
 ASK_NAME, ASK_START_TIME, ASK_END_TIME, ASK_REMINDERS = range(4)
@@ -180,7 +178,8 @@ async def send_reminders_loop(application, user_id, chat_id):
     if not u:
         return
     skip_day = False
-    if u["day"] == 1 and not is_within_today_working_period(u["start_time"], u["end_time"]):
+    day_num = get_user_current_day(u)
+    if day_num == 1 and not is_within_today_working_period(u["start_time"], u["end_time"]):
         skip_day = True
     while True:
         u = get_user(user_id)
@@ -205,7 +204,7 @@ async def send_reminders_loop(application, user_id, chat_id):
             await asyncio.sleep((start_dt - now).total_seconds())
         u = get_user(user_id)
         if u:
-            day_num = u["day"]
+            day_num = get_user_current_day(u)
             if day_num == 1:
                 await application.bot.send_message(
                     chat_id=chat_id,
@@ -275,8 +274,8 @@ async def send_reminders_loop(application, user_id, chat_id):
             if u:
                 user_name = u["username"] or u["name"] or "друг"
                 if u["pushups_today"] >= 100:
-                    day_completed = u["day"]
                     next_day(user_id)
+                    day_completed = get_user_current_day(u)
                     if day_completed >= 90:
                         await application.bot.send_message(
                             chat_id=chat_id,
@@ -304,7 +303,6 @@ async def send_reminders_loop(application, user_id, chat_id):
                         await application.bot.send_message(
                             chat_id=chat_id,
                             text=f"Пу-пу-пу… *{user_name}*, сьогодні ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
-                            parse_mode="Markdown",
                             reply_markup=get_main_keyboard()
                         )
                     else:
@@ -553,7 +551,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not u:
         await update.message.reply_text("Спочатку зареєструйся через /start", reply_markup=get_main_keyboard())
         return
-    day = u["day"]
+    day = get_user_current_day(u)
     fails = u["fails"]
     pushups = u["pushups_today"]
 
@@ -879,9 +877,10 @@ async def dump_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     msg = ""
     for row in rows:
+        day = get_user_current_day(dict(row))
         msg += (
             f"ID: {row['user_id']}, Name: {row['name']}, Username: {row['username']}, "
-            f"Pushups: {row['pushups_today']}, Day: {row['day']}, "
+            f"Pushups: {row['pushups_today']}, Day: {day}, "
             f"Fails: {row['fails']}, Completed: {row['completed_time']}, "
             f"LastDate: {row['last_date']}, Registered: {row['registered_date']}\n"
         )
