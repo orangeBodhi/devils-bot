@@ -127,14 +127,6 @@ def set_game_over(user_id, value=1):
     cur.execute("UPDATE users SET game_over = ? WHERE user_id = ?", (value, user_id))
     conn.commit()
 
-# --- команда для ручной миграции game_over ---
-async def migrate_gameover(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("Тільки для адміністратора.")
-        return
-    ensure_game_over_column()
-    await update.message.reply_text("Міграція game_over виконана (стовпець додано, якщо його не було).")
-
 def get_main_keyboard():
     keyboard = [
         [KeyboardButton("🎯 +10 віджимань"), KeyboardButton("🎯 +15 віджимань")],
@@ -281,24 +273,26 @@ async def send_reminders_loop(application, user_id, chat_id):
             continue
         if now < start_dt:
             await asyncio.sleep((start_dt - now).total_seconds())
+        # <<< ВСТАВЬ ПРИВЕТСТВИЕ ЗДЕСЬ >>>
         u = get_user(user_id)
         if not u or get_game_over(user_id):
             return
         day_num = get_user_current_day(u)
-#        if day_num == 1:
-#           await application.bot.send_message(
-#                chat_id=chat_id,
-#               text=f"{DEVIL} Вітаю в Devil's 100 Challenge, *{u['username'] or u['name'] or 'друг'}*! Сьогодні перший день челленджу, а отже тебі необхідно зробити перші 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
-#                parse_mode="Markdown",
-#               reply_markup=get_main_keyboard()
-#            )
-#        else:
-#            await application.bot.send_message(
-#                chat_id=chat_id,
-#                text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
-#                parse_mode="Markdown",
-#                reply_markup=get_main_keyboard()
-#            )
+        # Приветствие только в это утро (один раз в сутки)
+        if day_num == 1:
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=f"{DEVIL} Вітаю в Devil's 100 Challenge, *{u['username'] or u['name'] or 'друг'}*! Сьогодні перший день челленджу, а отже тобі необхідно зробити перші 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
+        else:
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
 
         # --- Рассылка напоминаний ---
         times = get_reminder_times(start_time, end_time, reminders_count)
@@ -1060,7 +1054,6 @@ def main():
     application.add_handler(MessageHandler(filters.Regex(f"^{LEADERBOARD}$"), lobby))
     application.add_handler(CommandHandler("dumpusers", dump_users))
     application.add_handler(CommandHandler("showtable", show_table_info))
-    application.add_handler(CommandHandler("migrate_gameover", migrate_gameover))  # Миграция game_over
     application.add_handler(MessageHandler(filters.Regex("^➖ Зменшити кількість$"), decrease_pushups_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
 
