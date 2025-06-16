@@ -220,24 +220,6 @@ async def send_reminders_loop(application, user_id, chat_id):
                     reply_markup=get_main_keyboard()
                 )
 
-            # --- Запускаем таск экстра-напоминания ---
-            async def extra_reminder():
-                # Ждем до 15 минут до конца дня
-                now = datetime.now(KIEV_TZ)
-                reminder_15min_dt = end_dt - timedelta(minutes=15)
-                if reminder_15min_dt > now:
-                    await asyncio.sleep((reminder_15min_dt - now).total_seconds())
-                # Проверяем pushups только в этот момент
-                pushups = get_pushups_today(user_id)
-                if pushups < 100:
-                    user_name = u["username"] or u["name"] or "друг"
-                    await application.bot.send_message(
-                        chat_id=chat_id,
-                        text=f"Лишилось 15 хвилин до кінця дня! Або збільшуй в налаштуваннях 'кінець дня' або добивай віджимання. За роботу, {user_name}! 👊",
-                        reply_markup=get_main_keyboard()
-                    )
-            extra_task = asyncio.create_task(extra_reminder())
-
             # --- Рассылка напоминаний ---
             times = get_reminder_times(start_time, end_time, reminders_count)
             now = datetime.now(KIEV_TZ)
@@ -264,10 +246,6 @@ async def send_reminders_loop(application, user_id, chat_id):
             seconds_to_end = (end_dt - datetime.now(KIEV_TZ)).total_seconds()
             if seconds_to_end > 0:
                 await asyncio.sleep(seconds_to_end)
-
-            # --- Убедимся, что экстра-напоминание завершено ---
-            if not extra_task.done():
-                await extra_task
 
             # --- Итог дня ---
             u = get_user(user_id)
@@ -337,7 +315,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def ask_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["name"] = update.message.text
     await update.message.reply_text(
-        "Вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00), коли бот починає працювати (початок дня) й коли ти зможешь почати записувати свої віджимання 🕒"
+        "Вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00), коли бот починає працювати (початок дня) і відправляти тобі нагадування віджатись 🕒"
     )
     return ASK_START_TIME
 
@@ -350,7 +328,7 @@ async def ask_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         return ASK_START_TIME
     context.user_data["start_time"] = time_text
     await update.message.reply_text(
-        "Вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 22:00), коли бот завершує роботу (кінець дня) 🕒 й ти більше не зможеш додавати віджимання в цей день"
+        "Вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 22:00), коли бот завершує роботу (кінець дня) і більше не буде тобі нагадувати віджатись 🕒"
     )
     return ASK_END_TIME
 
@@ -404,7 +382,7 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     await update.message.reply_text(
-        f"{DEVIL} Вітаю з реєстрацією в Devil's 100 Challenge, *{user_name}*! Очікуй на початок першого дня згідно з налаштуваннями (в момент початку дня, який ти встановив(ла) при реєстрації, і стартує челендж!) Побачимось! 👋",
+        f"{DEVIL} Вітаю з реєстрацією в Devil's 100 Challenge, *{user_name}*! Починай віджиматись протягом дня: з 00:00 до 23:59 ти маєш зробити свою сотку. У визначені тобою години роботи бота тобі будуть періодично направлятись нагадування, рівномірно і в тій кількості, яку ти встановив при реєстрації. Удачі!🍀",
         reply_markup=get_settings_only_keyboard(),
         parse_mode="Markdown"
     )
