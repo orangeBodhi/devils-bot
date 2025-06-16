@@ -26,50 +26,31 @@ def init_db():
             pushups_today INTEGER DEFAULT 0,
             last_date TEXT,
             fails INTEGER DEFAULT 0,
-            completed_time TEXT
-            -- registered_date будет добавлено миграцией!
+            completed_time TEXT,
+            registered_date TEXT
         )
     """)
     conn.commit()
-
-# --- МИГРАЦИОННЫЕ ФУНКЦИИ ---
-
-def ensure_registered_date_column():
-    conn = get_db()
-    cur = conn.cursor()
-    # Проверяем, есть ли уже столбец
-    cur.execute("PRAGMA table_info(users);")
-    columns = [row[1] for row in cur.fetchall()]
-    if "registered_date" not in columns:
-        cur.execute("ALTER TABLE users ADD COLUMN registered_date TEXT;")
-        conn.commit()
-
-def fill_registered_date_for_all_users(target_date="2025-06-10"):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT user_id, registered_date FROM users;")
-    for user_id, registered_date in cur.fetchall():
-        if not registered_date:
-            cur.execute("UPDATE users SET registered_date=? WHERE user_id=?", (target_date, user_id))
-    conn.commit()
-
-# --- ДАЛЬШЕ ВЕСЬ ТВОЙ СТАРЫЙ КОД ---
+    conn.close()
 
 def add_user(user_id, name, start_time, end_time, reminders, username=None):
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM users WHERE user_id=?", (user_id,))
     if cur.fetchone():
+        conn.close()
         return
-    # Теперь добавляем registered_date
+    # Зарегистрируем сегодняшнюю дату регистрации
+    today_str = date.today().isoformat()
     cur.execute(
         """
         INSERT INTO users (user_id, username, name, start_time, end_time, reminders, day, pushups_today, last_date, fails, completed_time, registered_date)
         VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, 0, NULL, ?)
         """,
-        (user_id, username, name, start_time, end_time, reminders, date.today().isoformat(), "2025-06-10")
+        (user_id, username, name, start_time, end_time, reminders, today_str, today_str)
     )
     conn.commit()
+    conn.close()
 
 def update_user_settings(user_id, start_time, end_time, reminders):
     conn = get_db()
@@ -79,12 +60,14 @@ def update_user_settings(user_id, start_time, end_time, reminders):
         (start_time, end_time, reminders, user_id)
     )
     conn.commit()
+    conn.close()
 
 def get_user(user_id):
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
     row = cur.fetchone()
+    conn.close()
     return dict(row) if row else None
 
 def reset_user(user_id):
@@ -92,6 +75,7 @@ def reset_user(user_id):
     cur = conn.cursor()
     cur.execute("DELETE FROM users WHERE user_id=?", (user_id,))
     conn.commit()
+    conn.close()
 
 def add_pushups(user_id, count):
     u = get_user(user_id)
@@ -120,6 +104,7 @@ def add_pushups(user_id, count):
         (new_pushups, today_str, day, fails, completed_time, user_id)
     )
     conn.commit()
+    conn.close()
     return True
 
 def decrease_pushups(user_id, count):
@@ -140,6 +125,7 @@ def decrease_pushups(user_id, count):
         (new_pushups, today_str, completed_time, user_id)
     )
     conn.commit()
+    conn.close()
     return new_pushups
 
 def get_pushups_today(user_id):
@@ -163,6 +149,7 @@ def next_day(user_id):
         (u["day"] + 1, today_str, u["fails"], user_id)
     )
     conn.commit()
+    conn.close()
 
 def fail_day(user_id):
     u = get_user(user_id)
@@ -177,6 +164,7 @@ def fail_day(user_id):
         (fails, u["day"] + 1, today_str, user_id)
     )
     conn.commit()
+    conn.close()
     return fails
 
 def get_fails(user_id):
@@ -191,7 +179,9 @@ def get_all_user_ids():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM users")
-    return [row["user_id"] for row in cur.fetchall()]
+    ids = [row["user_id"] for row in cur.fetchall()]
+    conn.close()
+    return ids
 
 def get_top_pushups_today(limit=5):
     conn = get_db()
@@ -199,8 +189,7 @@ def get_top_pushups_today(limit=5):
     today_str = date.today().isoformat()
     cur.execute(
         """
-        SELECT username, name, pushups_today, completed_time
-        FROM users
+        SELECT * FROM users
         WHERE last_date=?
         ORDER BY
             CASE WHEN pushups_today >= 100 THEN 0 ELSE 1 END,
@@ -210,4 +199,6 @@ def get_top_pushups_today(limit=5):
         """,
         (today_str, limit)
     )
-    return cur.fetchall()
+    rows = cur.fetchall()
+    conn.close()
+    return rows
