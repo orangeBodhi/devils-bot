@@ -27,10 +27,11 @@ def init_db():
             fails INTEGER DEFAULT 0,
             completed_time TEXT,
             registered_date TEXT,
-            notify_fail INTEGER DEFAULT 0
+            notify_fail INTEGER DEFAULT 0,
+            game_over INTEGER DEFAULT 0
         )
     """)
-    # Миграция для старых БД, если notify_fail нет
+    # Миграция для старых БД: notify_fail
     cur.execute("PRAGMA table_info(users);")
     cols = [row[1] for row in cur.fetchall()]
     if "notify_fail" not in cols:
@@ -39,6 +40,12 @@ def init_db():
             conn.commit()
         except Exception as e:
             print("Failed to add notify_fail:", e)
+    if "game_over" not in cols:
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN game_over INTEGER DEFAULT 0;")
+            conn.commit()
+        except Exception as e:
+            print("Failed to add game_over:", e)
     conn.commit()
     conn.close()
 
@@ -52,8 +59,8 @@ def add_user(user_id, name, start_time, end_time, reminders, username=None):
     today_str = date.today().isoformat()
     cur.execute(
         """
-        INSERT INTO users (user_id, username, name, start_time, end_time, reminders, pushups_today, last_date, fails, completed_time, registered_date, notify_fail)
-        VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, NULL, ?, 0)
+        INSERT INTO users (user_id, username, name, start_time, end_time, reminders, pushups_today, last_date, fails, completed_time, registered_date, notify_fail, game_over)
+        VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, NULL, ?, 0, 0)
         """,
         (user_id, username, name, start_time, end_time, reminders, today_str, today_str)
     )
@@ -81,14 +88,13 @@ def get_user(user_id):
 def reset_user(user_id):
     conn = get_db()
     cur = conn.cursor()
-    # Удаляем пользователя полностью, чтобы при повторной регистрации дата регистрации сбросилась
     cur.execute("DELETE FROM users WHERE user_id=?", (user_id,))
     conn.commit()
     conn.close()
 
 def add_pushups(user_id, count):
     u = get_user(user_id)
-    if not u:
+    if not u or u.get("game_over", 0):
         return False
     today_str = date.today().isoformat()
     now_str = datetime.now(KIEV_TZ).strftime("%Y-%m-%d %H:%M:%S")
@@ -101,7 +107,6 @@ def add_pushups(user_id, count):
         fails = u["fails"]
         completed_time = u.get("completed_time")
     new_pushups = min(pushups + count, 100)
-    # Если впервые достигли 100 — зафиксировать время
     if new_pushups >= 100 and not completed_time:
         completed_time = now_str
     conn = get_db()
@@ -116,13 +121,12 @@ def add_pushups(user_id, count):
 
 def decrease_pushups(user_id, count):
     u = get_user(user_id)
-    if not u:
+    if not u or u.get("game_over", 0):
         return False
     today_str = date.today().isoformat()
     cur_pushups = u["pushups_today"] if u["last_date"] == today_str else 0
     new_pushups = max(0, cur_pushups - count)
     completed_time = u["completed_time"]
-    # Если было >=100, а стало <100 — сбросить completed_time
     if cur_pushups >= 100 and new_pushups < 100:
         completed_time = None
     conn = get_db()
@@ -137,7 +141,7 @@ def decrease_pushups(user_id, count):
 
 def get_pushups_today(user_id):
     u = get_user(user_id)
-    if not u:
+    if not u or u.get("game_over", 0):
         return 0
     today_str = date.today().isoformat()
     if u["last_date"] != today_str:
@@ -146,7 +150,7 @@ def get_pushups_today(user_id):
 
 def next_day(user_id):
     u = get_user(user_id)
-    if not u:
+    if not u or u.get("game_over", 0):
         return
     today_str = date.today().isoformat()
     conn = get_db()
@@ -160,7 +164,7 @@ def next_day(user_id):
 
 def fail_day(user_id):
     u = get_user(user_id)
-    if not u:
+    if not u or u.get("game_over", 0):
         return 0
     fails = min(u["fails"] + 1, 3)
     today_str = date.today().isoformat()
@@ -176,12 +180,9 @@ def fail_day(user_id):
 
 def get_fails(user_id):
     u = get_user(user_id)
-    return u["fails"] if u else 0
+    return u["fails"] if u and not u.get("game_over", 0) else 0
 
 def get_user_current_day(u):
-    """
-    Возвращает текущий день челленджа для пользователя u (dict).
-    """
     today = date.today()
     reg_date = datetime.strptime(u["registered_date"], "%Y-%m-%d").date()
     return (today - reg_date).days + 1
@@ -201,7 +202,7 @@ def get_top_pushups_today(limit=5):
     cur.execute(
         """
         SELECT * FROM users
-        WHERE last_date=?
+        WHERE last_date=? AND game_over=0
         ORDER BY
             CASE WHEN pushups_today >= 100 THEN 0 ELSE 1 END,
             CASE WHEN pushups_today >= 100 THEN completed_time END ASC,
@@ -213,8 +214,6 @@ def get_top_pushups_today(limit=5):
     rows = cur.fetchall()
     conn.close()
     return rows
-
-# ---- Работа с notify_fail ----
 
 def get_notify_fail(user_id):
     conn = get_db()
@@ -228,5 +227,20 @@ def set_notify_fail(user_id, value):
     conn = get_db()
     cur = conn.cursor()
     cur.execute("UPDATE users SET notify_fail=? WHERE user_id=?", (value, user_id))
+    conn.commit()
+    conn.close()
+
+def get_game_over(user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT game_over FROM users WHERE user_id=?", (user_id,))
+    row = cur.fetchone()
+    conn.close()
+    return row["game_over"] if row else 0
+
+def set_game_over(user_id, value):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET game_over=? WHERE user_id=?", (value, user_id))
     conn.commit()
     conn.close()
