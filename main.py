@@ -210,96 +210,100 @@ async def global_midnight_job(application):
 
 async def send_reminders_loop(application, user_id, chat_id):
     while True:
-        u = get_user(user_id)
-        if not u or get_game_over(user_id):
-            return
-        start_time = u["start_time"]
-        end_time = u["end_time"]
-        reminders_count = u["reminders"]
-        now = datetime.now(KIEV_TZ)
-        today = now.date()
-        start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
-        end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
+        try:
+            u = get_user(user_id)
+            if not u or get_game_over(user_id):
+                return
+            start_time = u["start_time"]
+            end_time = u["end_time"]
+            reminders_count = u["reminders"]
+            now = datetime.now(KIEV_TZ)
+            today = now.date()
+            start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
+            end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
 
-        if now < start_dt:
-            await asyncio.sleep((start_dt - now).total_seconds())
-        u = get_user(user_id)
-        if not u or get_game_over(user_id):
-            return
-        day_num = get_user_current_day(u)
-        user_name = u["username"] or u["name"] or "друг"
-        fails = u["fails"]
-        if get_notify_fail(user_id):
+            if now < start_dt:
+                await asyncio.sleep((start_dt - now).total_seconds())
+            u = get_user(user_id)
+            if not u or get_game_over(user_id):
+                return
+            day_num = get_user_current_day(u)
+            user_name = u["username"] or u["name"] or "друг"
+            fails = u["fails"]
+            if get_notify_fail(user_id):
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"Пу-пу-пу… *{user_name}*, вчора ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_keyboard()
+                )
+                set_notify_fail(user_id, 0)
             await application.bot.send_message(
                 chat_id=chat_id,
-                text=f"Пу-пу-пу… *{user_name}*, вчора ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard()
-            )
-            set_notify_fail(user_id, 0)
-        await application.bot.send_message(
-            chat_id=chat_id,
-            text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
-            parse_mode="Markdown",
-            reply_markup=get_main_keyboard()
-        )
-
-        # --- Напоминания между start_time и end_time ---
-        times = get_reminder_times(start_time, end_time, reminders_count)
-        now = datetime.now(KIEV_TZ)
-        today = now.date()
-        reminder_datetimes = []
-        for t in times:
-            reminder_dt = KIEV_TZ.localize(datetime.combine(today, t))
-            if reminder_dt > now and reminder_dt < end_dt:
-                reminder_datetimes.append(reminder_dt)
-        for reminder_dt in reminder_datetimes:
-            seconds = (reminder_dt - datetime.now(KIEV_TZ)).total_seconds()
-            if seconds > 0:
-                await asyncio.sleep(seconds)
-            pushups = get_pushups_today(user_id)
-            if pushups >= 100 or get_game_over(user_id):
-                continue
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text="Агов! Ти не забув(ла) про челлендж? Відожмись! 💪",
-                reply_markup=get_main_keyboard()
-            )
-
-        # --- Ждем до конца дня пользователя ---
-        now = datetime.now(KIEV_TZ)
-        if now < end_dt:
-            await asyncio.sleep((end_dt - now).total_seconds())
-
-        # --- Итоговое сообщение в end_time ---
-        u = get_user(user_id)
-        if not u or get_game_over(user_id):
-            return
-        user_name = u["username"] or u["name"] or "друг"
-        pushups = u["pushups_today"]
-        if pushups >= 100:
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=f"Вітаю, *{user_name}*, ти молодець! Сьогоднішня сотка зроблена, побачимося завтра! {STRONG}",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard()
-            )
-        else:
-            left = 100 - pushups
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=f"Піднажми, *{user_name}*! Тобі залишилось зробити сьогодні {left} віджимань, а то - мінус серденько!",
+                text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
                 parse_mode="Markdown",
                 reply_markup=get_main_keyboard()
             )
 
-        # --- Ждем до следующего start_time пользователя ---
-        now = datetime.now(KIEV_TZ)
-        tomorrow = now.date() + timedelta(days=1)
-        next_start_dt = KIEV_TZ.localize(datetime.combine(tomorrow, datetime.strptime(start_time, "%H:%M").time()))
-        seconds_to_next_start = (next_start_dt - now).total_seconds()
-        if seconds_to_next_start > 0:
-            await asyncio.sleep(seconds_to_next_start)
+            # --- Напоминания между start_time и end_time ---
+            times = get_reminder_times(start_time, end_time, reminders_count)
+            now = datetime.now(KIEV_TZ)
+            today = now.date()
+            reminder_datetimes = []
+            for t in times:
+                reminder_dt = KIEV_TZ.localize(datetime.combine(today, t))
+                if reminder_dt > now and reminder_dt < end_dt:
+                    reminder_datetimes.append(reminder_dt)
+            for reminder_dt in reminder_datetimes:
+                seconds = (reminder_dt - datetime.now(KIEV_TZ)).total_seconds()
+                if seconds > 0:
+                    await asyncio.sleep(seconds)
+                pushups = get_pushups_today(user_id)
+                if pushups >= 100 or get_game_over(user_id):
+                    continue
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text="Агов! Ти не забув(ла) про челлендж? Відожмись! 💪",
+                    reply_markup=get_main_keyboard()
+                )
+
+            # --- Ждем до конца дня пользователя ---
+            now = datetime.now(KIEV_TZ)
+            if now < end_dt:
+                await asyncio.sleep((end_dt - now).total_seconds())
+
+            # --- Итоговое сообщение в end_time ---
+            u = get_user(user_id)
+            if not u or get_game_over(user_id):
+                return
+            user_name = u["username"] or u["name"] or "друг"
+            pushups = u["pushups_today"]
+            if pushups >= 100:
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"Вітаю, *{user_name}*, ти молодець! Сьогоднішня сотка зроблена, побачимося завтра! {STRONG}",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_keyboard()
+                )
+            else:
+                left = 100 - pushups
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"Піднажми, *{user_name}*! Тобі залишилось зробити сьогодні {left} віджимань, а то - мінус серденько!",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_keyboard()
+                )
+
+            # --- Ждем до следующего start_time пользователя ---
+            now = datetime.now(KIEV_TZ)
+            tomorrow = now.date() + timedelta(days=1)
+            next_start_dt = KIEV_TZ.localize(datetime.combine(tomorrow, datetime.strptime(start_time, "%H:%M").time()))
+            seconds_to_next_start = (next_start_dt - now).total_seconds()
+            if seconds_to_next_start > 0:
+                await asyncio.sleep(seconds_to_next_start)
+        except Exception as e:
+            logger.exception(f"Exception in send_reminders_loop for user {user_id}: {e}")
+            await asyncio.sleep(60)  # чтобы не спамить ошибками, ждем минуту перед повтором
 
 def start_reminders(application, user_id, chat_id):
     old_task = reminder_tasks.get(user_id)
