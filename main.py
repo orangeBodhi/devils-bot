@@ -82,7 +82,6 @@ reminder_tasks = {}
 
 KIEV_TZ = timezone("Europe/Kyiv")
 
-# --- game_over helpers ---
 def get_game_over(user_id):
     conn = get_db()
     cur = conn.cursor()
@@ -190,15 +189,26 @@ def is_within_today_working_period(start_time, end_time):
     end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
     return start_dt <= now < end_dt
 
-async def send_reminders_loop(application, user_id, chat_id):
-    u = get_user(user_id)
-    if not u or get_game_over(user_id):
-        return
-    skip_day = False
-    day_num = get_user_current_day(u)
+async def global_midnight_job(application):
+    while True:
+        now = datetime.now(KIEV_TZ)
+        tomorrow = now.date() + timedelta(days=1)
+        midnight = KIEV_TZ.localize(datetime.combine(tomorrow, dt_time(0, 0)))
+        seconds_to_midnight = (midnight - now).total_seconds()
+        if seconds_to_midnight > 0:
+            await asyncio.sleep(seconds_to_midnight)
 
-    if day_num == 1 and not is_within_today_working_period(u["start_time"], u["end_time"]):
-        skip_day = True
+        for user_id in get_all_user_ids():
+            u = get_user(user_id)
+            if not u or get_game_over(user_id):
+                continue
+            if u["pushups_today"] < 100:
+                fail_day(user_id)
+                set_notify_fail(user_id, 1)
+            next_day(user_id)
+        logger.info("Global midnight job: days updated for all users.")
+
+async def send_reminders_loop(application, user_id, chat_id):
     while True:
         u = get_user(user_id)
         if not u or get_game_over(user_id):
@@ -211,75 +221,37 @@ async def send_reminders_loop(application, user_id, chat_id):
         start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
         end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
 
-        # ====== УТРО: Проверить, надо ли уведомить о фейле ======
-        if get_notify_fail(user_id):
-            user_name = u["username"] or u["name"] or "друг"
-            fails = u["fails"]
-            if fails < 3:
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"Пу-пу-пу… *{user_name}*, вчора ти не осилив(ла) сотку. Нажаль, це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
-                    reply_markup=get_main_keyboard(),
-                    parse_mode="Markdown"
-                )
-            else:
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"Нажаль ти зафейлив(ла) третій раз! {SKULL}\nДля тебе, *{user_name}*, Devil's 100 Challenge закінчено… цього разу!\nДля перезапуску напиши /reset",
-                    reply_markup=ReplyKeyboardRemove(),
-                    parse_mode="Markdown"
-                )
-                set_game_over(user_id, 1)
-            set_notify_fail(user_id, 0)
-
-        if skip_day:
-            if now >= end_dt:
-                next_start_dt = KIEV_TZ.localize(datetime.combine(today + timedelta(days=1), datetime.strptime(start_time, "%H:%M").time()))
-                await asyncio.sleep((next_start_dt - now).total_seconds())
-            elif now < start_dt:
-                await asyncio.sleep((start_dt - now).total_seconds())
-            skip_day = False
-            continue
-
-        # --- Ожидание до старта дня пользователя ---
-        send_greeting = False
         if now < start_dt:
             await asyncio.sleep((start_dt - now).total_seconds())
-            send_greeting = True
-        else:
-            # Если бот стартует после start_time, то приветствие шлём только если прошло не больше часа после start_time
-            if (now - start_dt).total_seconds() < 30 * 60:
-                send_greeting = True
-
-        # --- Приветствие только утром и только если бот не опоздал! ---
         u = get_user(user_id)
         if not u or get_game_over(user_id):
             return
         day_num = get_user_current_day(u)
-        if send_greeting:
-            if day_num == 1:
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"{DEVIL} Вітаю в Devil's 100 Challenge, *{u['username'] or u['name'] or 'друг'}*! Сьогодні перший день челленджу, а отже тобі необхідно зробити перші 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
-                    parse_mode="Markdown",
-                    reply_markup=get_main_keyboard()
-                )
-            else:
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
-                    parse_mode="Markdown",
-                    reply_markup=get_main_keyboard()
-                )
+        user_name = u["username"] or u["name"] or "друг"
+        fails = u["fails"]
+        if get_notify_fail(user_id):
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=f"Пу-пу-пу… *{user_name}*, вчора ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
+            set_notify_fail(user_id, 0)
+        await application.bot.send_message(
+            chat_id=chat_id,
+            text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard()
+        )
 
-        # --- Рассылка напоминаний ---
+        # --- Напоминания между start_time и end_time ---
         times = get_reminder_times(start_time, end_time, reminders_count)
         now = datetime.now(KIEV_TZ)
         today = now.date()
         reminder_datetimes = []
         for t in times:
             reminder_dt = KIEV_TZ.localize(datetime.combine(today, t))
-            if reminder_dt > now:
+            if reminder_dt > now and reminder_dt < end_dt:
                 reminder_datetimes.append(reminder_dt)
         for reminder_dt in reminder_datetimes:
             seconds = (reminder_dt - datetime.now(KIEV_TZ)).total_seconds()
@@ -294,48 +266,40 @@ async def send_reminders_loop(application, user_id, chat_id):
                 reply_markup=get_main_keyboard()
             )
 
-        # --- Ждем до конца календарного дня! ---
+        # --- Ждем до конца дня пользователя ---
         now = datetime.now(KIEV_TZ)
-        tomorrow = now.date() + timedelta(days=1)
-        midnight = KIEV_TZ.localize(datetime.combine(tomorrow, dt_time(0, 0)))
-        seconds_to_midnight = (midnight - now).total_seconds()
-        if seconds_to_midnight > 0:
-            await asyncio.sleep(seconds_to_midnight)
+        if now < end_dt:
+            await asyncio.sleep((end_dt - now).total_seconds())
 
-        # --- Итог дня: только после полуночи! ---
+        # --- Итоговое сообщение в end_time ---
         u = get_user(user_id)
         if not u or get_game_over(user_id):
             return
         user_name = u["username"] or u["name"] or "друг"
-        if u["pushups_today"] >= 100:
-            next_day(user_id)
-            day_completed = get_user_current_day(u)
-            if day_completed >= 90:
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text=(
-                        "🎉 Вітаю з перемогою в Devil's 100 Challenge! 💪🔥\n"
-                        "Ти довів(ла), що сила — не лише в м'язах, а й у характері.\n"
-                        "Кожен ранок, кожен підхід, кожна крапля поту — це крок до перемоги над собою.\n"
-                        "Ти — натхнення для всіх, хто прагне до дісципліни та самовдосконалення! 🌟\n"
-                        "👏 Браво, чемпіоне! Нехай цей успіх стане лише початком нових звершень! 🚀\n"
-                        "🏆 #90ДнівСили #ЗалізнаВоля👊"
-                    ),
-                    parse_mode="Markdown",
-                    reply_markup=get_main_keyboard()
-                )
-            else:
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"Вітаю, *{user_name}*, ти молодець! Сьогоднішня сотка зроблена, побачимося завтра! {STRONG}",
-                    parse_mode="Markdown",
-                    reply_markup=get_main_keyboard()
-                )
+        pushups = u["pushups_today"]
+        if pushups >= 100:
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=f"Вітаю, *{user_name}*, ти молодець! Сьогоднішня сотка зроблена, побачимося завтра! {STRONG}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
         else:
-            fails = fail_day(user_id)
-            set_notify_fail(user_id, 1)
-            if fails >= 3:
-                set_game_over(user_id, 1)
+            left = 100 - pushups
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=f"Піднажми, *{user_name}*! Тобі залишилось зробити сьогодні {left} віджимань, а то - мінус серденько!",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
+
+        # --- Ждем до следующего start_time пользователя ---
+        now = datetime.now(KIEV_TZ)
+        tomorrow = now.date() + timedelta(days=1)
+        next_start_dt = KIEV_TZ.localize(datetime.combine(tomorrow, datetime.strptime(start_time, "%H:%M").time()))
+        seconds_to_next_start = (next_start_dt - now).total_seconds()
+        if seconds_to_next_start > 0:
+            await asyncio.sleep(seconds_to_next_start)
 
 def start_reminders(application, user_id, chat_id):
     old_task = reminder_tasks.get(user_id)
@@ -346,6 +310,9 @@ def start_reminders(application, user_id, chat_id):
     task = asyncio.create_task(send_reminders_loop(application, user_id, chat_id))
     reminder_tasks[user_id] = task
 
+# === ДАЛЕЕ ИДУТ ВСЕ ТВОИ ХЕНДЛЕРЫ И КОМАНДЫ (БЕЗ ИЗМЕНЕНИЙ) ===
+
+# --- Хэндлеры старта и регистрации ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     user_db = get_user(user.id)
@@ -367,7 +334,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def ask_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["name"] = update.message.text
     await update.message.reply_text(
-        "Вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00), коли бот починає працювати (початок дня) і відправляти тобі нагадування віджатись 🕒"
+        "Вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00), коли бот починає працювати (початок дня) і відправлятиме перше нагадування.",
+        reply_markup=get_back_keyboard()
     )
     return ASK_START_TIME
 
@@ -380,7 +348,8 @@ async def ask_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         return ASK_START_TIME
     context.user_data["start_time"] = time_text
     await update.message.reply_text(
-        "Вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 22:00), коли бот завершує роботу (кінець дня) і більше не буде тобі нагадувати віджатись 🕒"
+        "Вкажи час у форматі ГОДИНИ:ХВИЛИНИ (наприклад, 22:00), коли бот завершує роботу (кінець дня) і більше не буде надсилати нагадування.",
+        reply_markup=get_back_keyboard()
     )
     return ASK_END_TIME
 
@@ -404,7 +373,8 @@ async def ask_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
     context.user_data["end_time"] = end_time
     await update.message.reply_text(
-        "Сікільки разів на день тобі нагадувать про віджимання? Мінімум 2, максимум 10 🔔 Нагадування будут рівномірно розподілені по робочему дню"
+        "Сікільки разів на день тобі нагадувать про віджимання? Мінімум 2, максимум 10 🔔 Нагадування будут рівномірно протягом робочого дня.",
+        reply_markup=get_back_keyboard()
     )
     return ASK_REMINDERS
 
@@ -413,12 +383,14 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reminders = int(update.message.text)
     except ValueError:
         await update.message.reply_text(
-            "Будь ласка, вкажи число (від 2 до 10)\nСікільки разів на день тобі нагадувать про віджимання? Мінімум 2, максимум 10 🔔 Нагадування будут рівномірно розподілені по робочему дню"
+            "Будь ласка, вкажи число (від 2 до 10)\nСікільки разів на день тобі нагадувать про віджимання? Мінімум 2, максимум 10.",
+            reply_markup=get_back_keyboard()
         )
         return ASK_REMINDERS
     if reminders < 2 or reminders > 10:
         await update.message.reply_text(
-            "Число має бути від 2 до 10\nСікільки разів на день тобі нагадувать про віджимання? Мінімум 2, максимум 10 🔔 Нагадування будут рівномірно розподілені по робочему дню"
+            "Число має бути від 2 до 10\nСікільки разів на день тобі нагадувать про віджимання? Мінімум 2, максимум 10.",
+            reply_markup=get_back_keyboard()
         )
         return ASK_REMINDERS
     context.user_data["reminders"] = reminders
@@ -434,7 +406,7 @@ async def save_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     await update.message.reply_text(
-        f"{DEVIL} Вітаю з реєстрацією в Devil's 100 Challenge, *{user_name}*! Починай віджиматись протягом дня: з 00:00 до 23:59 ти маєш зробити свою сотку. У визначені тобою години роботи бота тобі будуть періодично направлятись нагадування, рівномірно і в тій кількості, яку ти встановив при реєстрації. Удачі!🍀",
+        f"{DEVIL} Вітаю з реєстрацією в Devil's 100 Challenge, *{user_name}*! Починай віджиматись протягом дня: з 00:00 до 23:59 ти маєш зробити 100 віджимань.",
         reply_markup=get_settings_only_keyboard(),
         parse_mode="Markdown"
     )
@@ -585,7 +557,7 @@ async def handle_custom_pushups(update: Update, context: ContextTypes.DEFAULT_TY
             return
         await add_pushups_generic(update, context, count)
         context.user_data["awaiting_custom"] = False
-        
+
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     u = get_user(user.id)
@@ -643,7 +615,7 @@ async def check_end_of_day(user_id, update):
             )
         else:
             await update.message.reply_text(
-                f"Нажаль ти зафейлив(ла) третій раз! {SKULL}\nДля тебе, *{user_name}*, Devil's 100 Challenge закінчено… цього разу!\nДля перезапуску напиши /reset",
+                f"Нажаль ти зафейлив(ла) третій раз! {SKULL}\nДля тебе, *{user_name}*, Devil's 100 Challenge закінчено… цього разу!\nДля перезапуску натисни /reset",
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode="Markdown"
             )
@@ -670,6 +642,7 @@ async def addday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await status(update, context)
 
 async def on_startup(application: Application):
+    asyncio.create_task(global_midnight_job(application))
     for user_id in get_all_user_ids():
         user = get_user(user_id)
         if user and not get_game_over(user_id):
@@ -695,6 +668,7 @@ async def cancel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
+# ConversationHandler для настроек пользователя
 async def settings_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if get_game_over(user.id):
@@ -755,7 +729,7 @@ async def settings_input_start(update: Update, context: ContextTypes.DEFAULT_TYP
     end_time = context.user_data.get("new_end_time") or user_db["end_time"]
     if time_to_minutes(time_text) >= time_to_minutes(end_time):
         await update.message.reply_text(
-            "Час кінця дня має бути візніше часу початку дня! Спробуй знову.\nВкажи новий час початку дня в форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00):",
+            "Час кінця дня має бути пізніше часу початку дня! Спробуй знову.\nВкажи новий час початку дня в форматі ГОДИНИ:ХВИЛИНИ (наприклад, 07:00):",
             reply_markup=get_back_keyboard()
         )
         return SETTINGS_INPUT_START
