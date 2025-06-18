@@ -171,15 +171,33 @@ def minutes_to_time(mins):
 def get_reminder_times(start_time_str, end_time_str, reminders_count):
     start_dt = datetime.strptime(start_time_str, "%H:%M")
     end_dt = datetime.strptime(end_time_str, "%H:%M")
-    total_minutes = int((end_dt - start_dt).total_seconds() // 60)
+
     if reminders_count < 2:
-        return [start_dt.time()]
-    interval = total_minutes / (reminders_count - 1)
+        # Одно напоминание — через час после старта, но не позже чем за час до конца
+        reminder_time = start_dt + timedelta(hours=1)
+        latest_time = end_dt - timedelta(hours=1)
+        if reminder_time > latest_time:
+            reminder_time = latest_time
+        return [reminder_time.time()]
+
+    # Диапазон для равномерного распределения
+    actual_start = start_dt + timedelta(hours=1)
+    actual_end = end_dt - timedelta(hours=1)
+    total_minutes = int((actual_end - actual_start).total_seconds() // 60)
+    if total_minutes < 0:
+        # Если диапазон некорректный
+        return []
+
     times = []
-    for i in range(reminders_count):
-        mins = int(round(i * interval))
-        t = (start_dt + timedelta(minutes=mins)).time()
-        times.append(t)
+    if reminders_count == 2:
+        # Только два напоминания: через час после старта и за час до конца
+        times = [actual_start.time(), actual_end.time()]
+    else:
+        interval = total_minutes / (reminders_count - 1)
+        for i in range(reminders_count):
+            mins = int(round(i * interval))
+            t = (actual_start + timedelta(minutes=mins)).time()
+            times.append(t)
     return times
 
 def is_within_today_working_period(start_time, end_time):
