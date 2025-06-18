@@ -960,12 +960,15 @@ async def dump_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = ""
     for row in rows:
         day = get_user_current_day(dict(row))
+        # Добавляем greeted_date в вывод
+        greeted_date = row["greeted_date"] if "greeted_date" in row.keys() else "N/A"
         msg += (
             f"ID: {row['user_id']}, Name: {row['name']}, Username: {row['username']}, "
             f"Pushups: {row['pushups_today']}, Day: {day}, "
             f"Fails: {row['fails']}, Completed: {row['completed_time']}, "
             f"LastDate: {row['last_date']}, Registered: {row['registered_date']}, "
-            f"GameOver: {row['game_over'] if 'game_over' in row.keys() else 'N/A'}\n"
+            f"GameOver: {row['game_over'] if 'game_over' in row.keys() else 'N/A'}, "
+            f"GreetedDate: {greeted_date}\n"
         )
     for i in range(0, len(msg), 4000):
         await update.message.reply_text(msg[i:i+4000])
