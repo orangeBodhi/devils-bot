@@ -983,6 +983,20 @@ async def purge_failed_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
     delete_users_with_3_fails()
     await update.message.reply_text("Всі гравці з 3 фейлами видалені з бази.")
 
+async def add_greeted_date_to_all(update, context):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("Тільки для адміністратора.")
+        return
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN greeted_date TEXT DEFAULT ''")
+    except Exception:
+        pass
+    cur.execute("UPDATE users SET greeted_date = '' WHERE greeted_date IS NULL OR greeted_date = ''")
+    conn.commit()
+    await update.message.reply_text("Поле greeted_date успішно додано всім користувачам.")
+      
 def main():
     application = Application.builder().token(TOKEN).build()
 
@@ -1029,6 +1043,7 @@ def main():
     application.add_handler(CommandHandler("dumpusers", dump_users))
     application.add_handler(CommandHandler("showtable", show_table_info))
     application.add_handler(CommandHandler("purgefailed", purge_failed_users))
+    application.add_handler(CommandHandler("addgreeted", add_greeted_date_to_all))
     application.add_handler(MessageHandler(filters.Regex("^➖ Зменшити кількість$"), decrease_pushups_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_pushups))
 
