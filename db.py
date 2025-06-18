@@ -251,3 +251,10 @@ def set_game_over(user_id, value):
     cur.execute("UPDATE users SET game_over=? WHERE user_id=?", (value, user_id))
     conn.commit()
     conn.close()
+
+def set_greeted_date(user_id, date_str):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET greeted_date=? WHERE user_id=?", (date_str, user_id))
+    conn.commit()
+    conn.close()
