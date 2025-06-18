@@ -278,7 +278,11 @@ async def send_reminders_loop(application, user_id, chat_id):
                 return
             user_name = u["username"] or u["name"] or "друг"
             pushups = u["pushups_today"]
-            if pushups >= 100:
+            completed_time = u.get("completed_time")
+            today_str = datetime.now(KIEV_TZ).strftime("%Y-%m-%d")
+            completed_date = completed_time[:10] if completed_time else None
+
+            if pushups >= 100 and completed_date == today_str:
                 await application.bot.send_message(
                     chat_id=chat_id,
                     text=f"Вітаю, *{user_name}*, ти молодець! Сьогоднішня сотка зроблена, побачимося завтра! {STRONG}",
@@ -313,8 +317,6 @@ def start_reminders(application, user_id, chat_id):
         return
     task = asyncio.create_task(send_reminders_loop(application, user_id, chat_id))
     reminder_tasks[user_id] = task
-
-# === ДАЛЕЕ ИДУТ ВСЕ ТВОИ ХЕНДЛЕРЫ И КОМАНДЫ (БЕЗ ИЗМЕНЕНИЙ) ===
 
 # --- Хэндлеры старта и регистрации ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
