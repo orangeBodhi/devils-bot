@@ -240,28 +240,35 @@ async def send_reminders_loop(application, user_id, chat_id):
             start_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(start_time, "%H:%M").time()))
             end_dt = KIEV_TZ.localize(datetime.combine(today, datetime.strptime(end_time, "%H:%M").time()))
 
+            # --- Ждём до start_time пользователя ---
             if now < start_dt:
                 await asyncio.sleep((start_dt - now).total_seconds())
+
+            # --- Проверка greeted_date и отправка приветствия ---
             u = get_user(user_id)
             if not u or get_game_over(user_id):
                 return
-            day_num = get_user_current_day(u)
-            user_name = u["username"] or u["name"] or "друг"
-            fails = u["fails"]
-            if get_notify_fail(user_id):
+            today_str = datetime.now(KIEV_TZ).strftime("%Y-%m-%d")
+            greeted_date = u.get("greeted_date", "")
+            if greeted_date != today_str:
+                day_num = get_user_current_day(u)
+                user_name = u["username"] or u["name"] or "друг"
+                fails = u["fails"]
+                if get_notify_fail(user_id):
+                    await application.bot.send_message(
+                        chat_id=chat_id,
+                        text=f"Пу-пу-пу… *{user_name}*, вчора ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
+                        parse_mode="Markdown",
+                        reply_markup=get_main_keyboard()
+                    )
+                    set_notify_fail(user_id, 0)
                 await application.bot.send_message(
                     chat_id=chat_id,
-                    text=f"Пу-пу-пу… *{user_name}*, вчора ти не осилив(ла) сотку. Нажаль це мінус жізнь. В тебе лишилось усього: {hearts(fails)}",
+                    text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
                     parse_mode="Markdown",
                     reply_markup=get_main_keyboard()
                 )
-                set_notify_fail(user_id, 0)
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=f"Знову вітаю в Devil's 100 Challenge! {DEVIL} Сьогодні {emoji_number(day_num)} день змагання, а значить тобі треба зробити чергові 100 віджимань! Хай щастить і гарного дня! {CLOVER}",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard()
-            )
+                set_greeted_date(user_id, today_str)
 
             # --- Напоминания между start_time и end_time ---
             times = get_reminder_times(start_time, end_time, reminders_count)
